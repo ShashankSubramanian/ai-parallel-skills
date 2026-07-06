@@ -15,4 +15,4 @@ Pick the simplest plan that fits memory and avoids unnecessary collectives. It d
 ## Good Patterns
 
 - Try to fit patterns in standard data parallel, tensor (row and column parallel), context parallel.
-- For spatial parallel, typically halo exchange, or distributed tensor rolls are good patterns. Avoid full spatial all-gathers unless necessary in every block.
+- For spatial parallel, typically halo exchange, or distributed tensor rolls are good patterns. Avoid full spatial all-gathers in every block, unless necessary.

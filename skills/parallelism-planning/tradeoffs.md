@@ -1,6 +1,6 @@
 # Parallelism Tradeoffs
 
-Use this file to explain pros and cons in the user-facing plan.
+Use this file to plan and / or explain the pros and cons of the chosen parallelism strategy.
 
 ## Data Parallelism
 
@@ -24,11 +24,10 @@ Pros:
 - Reduces per-GPU weight and activation memory for sharded layers.
 - Works well for large linear, embedding, vocabulary, convolution, and attention
   head dimensions.
-- Can preserve exact numerics with correct collectives.
 
 Cons:
 
-- Requires invasive layer rewrites or wrappers.
+- Requires layer rewrites or wrappers.
 - Adds collectives on forward or backward paths.
 - Shape divisibility and layout assumptions become part of the API.
 
@@ -37,7 +36,7 @@ Cons:
 Pros:
 
 - Reduces sequence/context activation memory.
-- Useful for long-context transformers and other sequence models.
+- Useful for long-context transformers and other sequence models like ViTs.
 - Can compose with tensor or data parallelism.
 
 Cons:
