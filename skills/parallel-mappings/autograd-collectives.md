@@ -66,6 +66,8 @@ When parameters carry `comm_metadata`, provide a helper equivalent to
 - Scale gradients by data-parallel size, not by combined model-parallel group
   size.
 - Keep backend-specific DDP arguments explicit, especially for `gloo`.
+- Do not infer missing metadata in the hook. Missing metadata should fail during
+  the annotate-model validation phase.
 
 ## Correctness Expectations
 

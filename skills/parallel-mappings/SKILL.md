@@ -1,6 +1,6 @@
 ---
 name: parallel-mappings
-description: Implements required distributed helper primitives and autograd mappings for data, tensor, context, and spatial parallel model code. Use after topology and comm.py process groups are defined.
+description: Implements required distributed helper primitives and autograd mappings for data, tensor, context, and spatial parallel model code. Use after topology, comm.py process groups, and parameter annotations are defined.
 ---
 
 # Parallel Mappings
@@ -13,6 +13,7 @@ here.
 
 - Approved model and parallelism plan.
 - `comm.py` from the topology-and-groups skill.
+- `param.comm_metadata` annotations from the annotate-model skill.
 - Logical and per-rank tensor shapes.
 - Exact forward and backward equivalence requirements.
 
@@ -35,9 +36,11 @@ already present:
 3. Use `comm.get_size`, `comm.get_rank`, `comm.get_group`, and `comm.get_root`
    for all communicator access.
 4. Keep helper functions no-op for group size one.
-5. Insert public mapping helpers at model tensor boundaries identified in the
+5. Ensure DDP or backward hooks consume `param.comm_metadata["reduce"]` for
+   non-DP gradient reductions.
+6. Insert public mapping helpers at model tensor boundaries identified in the
    approved plan.
-6. Add or update correctness tests through the parallel-unit-tests skill.
+7. Add or update correctness tests through the parallel-unit-tests skill.
 
 ## Mapping Rules
 
@@ -72,6 +75,7 @@ Use `megatron-patterns.md` for placement details.
 
 - Helper primitives exist before layer edits.
 - Autograd mapping wrappers exist before layer edits.
+- Parameter annotations already exist and are not inferred inside mappings.
 - Each sharded module documents logical shape and per-rank shape.
 - Each collective names its process group.
 - Backward behavior is explicit for every custom mapping.

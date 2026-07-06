@@ -104,12 +104,9 @@ Behavior:
   along `dim1`.
 - Both helpers must work as no-ops or local operations when group size is one.
 
-## Parameter Initialization Helper
+## Parameter Metadata Boundary
 
-Implement `init_params_for_shared_weights(model)` when the target model uses
-parameter `comm_metadata`. The helper should:
-
-- Add conservative default metadata for unannotated parameters.
-- Broadcast shared parameters from `comm.get_root(comm_group)` within each
-  metadata `shared` group.
-- Leave sharded-only parameters untouched.
+Do not infer or attach `param.comm_metadata` in mapping helpers. Parameter
+annotation and shared-weight initialization belong to
+`../annotate-model/SKILL.md`. Helpers may assume metadata validation has already
+run when they are called from training hooks.

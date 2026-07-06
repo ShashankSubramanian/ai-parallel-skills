@@ -1,6 +1,6 @@
 ---
 name: ai-parallelism-master-skill
-description: Orchestrates AI model parallelism work. Use when user wants to parallelize their AI model. The agent must analyze the target model, plan the parallelism strategy, wait for approval, then implement communication groups, mappings, and equivalence tests. Pipeline parallelism is out of scope.
+description: Orchestrates AI model parallelism work. Use when user wants to parallelize their AI model. The agent must analyze the target model, plan the parallelism strategy, wait for approval, then implement communication groups, parameter annotations, mappings, and equivalence tests. Pipeline parallelism is out of scope.
 ---
 
 # AI Parallelism Master
@@ -14,9 +14,10 @@ Use this as the entry point for parallelizing an AI model. Pipeline parallelism 
 - [ ] Print the plan: shapes, memory, bottlenecks
 - [ ] Use `../parallelism-planning/SKILL.md` to choose the parallelism strategy
 - [ ] Print the plan: shapes, memory, bottleneck, sharding, collectives,
-  tradeoffs, and tests.
+  parameter metadata handoff, tradeoffs, and tests.
 - [ ] Stop and wait for explicit user approval.
 - [ ] Implement communication groups (topology) using `../topology-and-groups/SKILL.md`
+- [ ] Annotate every trainable parameter with `comm_metadata` using `../annotate-model/SKILL.md`
 - [ ] Implement helper functions for collectives and mappings using `../parallel-mappings/SKILL.md`
 - [ ] Add equivalence tests for forward, input gradients, and weight gradients using `../parallel-unit-tests/SKILL.md`.
 - [ ] Run or document the correctness tests.
@@ -26,5 +27,6 @@ Use this as the entry point for parallelizing an AI model. Pipeline parallelism 
 - Analysis: `../model-analysis/SKILL.md`
 - Planning: `../parallelism-planning/SKILL.md`
 - Topology/groups: `../topology-and-groups/SKILL.md`
+- Parameter annotations: `../annotate-model/SKILL.md`
 - Mappings/collectives: `../parallel-mappings/SKILL.md`
 - Tests: `../parallel-unit-tests/SKILL.md`

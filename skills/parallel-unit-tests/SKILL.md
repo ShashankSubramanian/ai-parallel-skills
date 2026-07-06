@@ -5,8 +5,8 @@ description: Adds correctness tests for AI model parallel implementations. Use t
 
 # Parallel Unit Tests
 
-Use this skill after topology and mappings are implemented. Correctness tests
-must pass before optimization work.
+Use this skill after topology, parameter annotations, and mappings are
+implemented. Correctness tests must pass before optimization work.
 
 ## Required Tests
 
@@ -19,6 +19,8 @@ Test:
 - Input-gradient equivalence.
 - Weight-gradient equivalence.
 - Shape equivalence after gathering logical outputs.
+- Parameter `comm_metadata` coverage and group-name validity.
+- Extra gradient reductions named in `comm_metadata["reduce"]`.
 - Single-device or world-size-one behavior.
 
 ## Test Setup
@@ -27,16 +29,20 @@ Test:
 2. Initialize the single-device model and distributed model from the same
    logical weights.
 3. Shard weights explicitly according to the plan.
-4. Feed equivalent logical inputs.
-5. Gather or reduce distributed outputs into logical form before comparison.
-6. Use the same scalar loss for backward.
-7. Gather or reduce gradients into logical form before comparison.
+4. Validate parameter metadata before shared-weight initialization.
+5. Broadcast parameters across their `comm_metadata["shared"]` groups.
+6. Feed equivalent logical inputs.
+7. Gather or reduce distributed outputs into logical form before comparison.
+8. Use the same scalar loss for backward.
+9. Gather or reduce gradients into logical form before comparison.
 
 ## Assertions
 
 - Output tensors match within dtype-appropriate tolerances.
 - Input gradients match within dtype-appropriate tolerances.
 - Weight gradients match the corresponding shard or gathered logical tensor.
+- Every trainable parameter has valid `comm_metadata`.
+- Parameters replicated across `shared` groups match after initialization.
 - No rank has missing gradients for trainable local parameters.
 - Collectives are called in a consistent order across ranks.
 

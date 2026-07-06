@@ -27,6 +27,9 @@ Wait for explicit user approval before editing the target model code.
   explain tradeoffs.
 - Use `skills/topology-and-groups/SKILL.md` to define ranks, device meshes, and
   communication groups.
+- Use `skills/annotate-model/SKILL.md` after topology setup to mark every
+  trainable parameter with `comm_metadata` for sharded, shared, and extra
+  gradient-reduction groups.
 - Use `skills/parallel-mappings/SKILL.md` to insert collectives and custom
   autograd mappings.
 - Use `skills/parallel-unit-tests/SKILL.md` to prove equivalence with the
