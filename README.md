@@ -4,8 +4,8 @@ Portable skills for AI coding agents that need to add data, tensor, context, or
 spatial parallelism to model code.
 
 Start with `skills/ai-parallelism-master/SKILL.md`. The master skill routes the
-agent through model analysis, parallelism planning, topology setup, collective
-mappings, and equivalence tests.
+agent through model analysis, parallelism planning, topology setup, parameter
+annotation, collective mappings, and equivalence tests.
 
 Pipeline parallelism, profiling, and full example projects are out of scope for
 now.
@@ -18,6 +18,7 @@ skills/
   model-analysis/          Builds the compact model, shape, and memory plan.
   parallelism-planning/    Selects data, tensor, context, or spatial sharding.
   topology-and-groups/     Defines rank topology and communication groups.
+  annotate-model/          Marks trainable parameters with communication metadata.
   parallel-mappings/       Inserts collectives and autograd mappings.
   parallel-unit-tests/     Verifies forward, input-gradient, and weight-gradient equivalence.
 
@@ -26,6 +27,9 @@ reference/
   parallelism-contract.md  Sharded/local tensor contract notation.
   example-parallelism.md   MLP, attention, and conv sharding examples.
   collectives.md           Collective operations and forward/backward duals.
+
+models/
+  vit.py                   Minimal Vision Transformer used for examples and checks.
 ```
 
 ## Workflow
@@ -36,7 +40,8 @@ reference/
 3. Choose a parallelization strategy based on the bottleneck.
 4. Present the plan, expected memory reduction, pros, cons, and risks.
 5. Wait for explicit user approval before editing code.
-6. Implement topology/groups, mappings/collectives, and correctness tests.
+6. Implement topology/groups, parameter annotations, mappings/collectives, and
+   correctness tests.
 7. Verify the distributed version matches the single-device version for forward
    outputs, input gradients, and weight gradients.
 
