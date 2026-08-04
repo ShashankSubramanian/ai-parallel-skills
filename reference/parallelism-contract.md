@@ -1,13 +1,13 @@
 # Parallelism Contract
 
-The parallelism contract refers to a string representation of the sharded or local tensor shapes involved or mathematical operations. This references formalizes how to write tensor and operation contracts for sharding any layer and includes costs associated with the sharding.
-If not specificied, use the following conventions:
+The parallelism contract is a string representation of the local tensor shapes in a mathematical operation. This reference defines how to write tensor and operation contracts, including the communication required by each sharding choice.
+If not specified, use the following conventions:
+
 - `dp`: data parallelism.
 - `tp`: tensor parallelism.
 - `cp`: context parallelism.
 - `sp`: spatial parallelism.
 - `seqp`: sequence parallelism.
-
 
 ## Device Mesh
 
@@ -16,6 +16,7 @@ Given total number of devices, `N`, a device mesh is a logical grouping of the `
 ## Tensor Contract for Sharded / Local Tensors
 
 When planning parallelism and sharding, write the local tensor shapes keeping in mind the device mesh. For example, if `tp` devices are used to shard `l`, then the local tensor shape is:
+
 ```text
 b l/tp e
 ```
@@ -29,34 +30,65 @@ Illegal sharding is when the tensor layout needs more mesh dimensions than the d
 
 Model operations may or may not introduce communication collectives. See `collectives.md` for the list of collectives and their contracts.
 
-For matmuls, if the inner / contracting /common dimension is sharded, then the operation computes a partial sum and requires a reduce collective (typically all-reduce) to sync the result. For example:
+For a two-input einsum, first write the logical contract:
+
+```text
+left labels, right labels -> output labels
+```
+
+- **Shared batch labels** appear in both inputs and the output.
+- **Contracting labels** appear in both inputs but not the output.
+- **Free labels** appear in exactly one input and the output. A model batch dimension is free when the other input is broadcast over it.
+
+For example, in `b l e, b e f -> b l f`, `b` is a shared batch label. In `b l e, e f -> b l f`, `b` is a free label because the weight matrix is broadcast over the batch.
+
+Then apply these sharding rules:
+
+1. **A contracting dimension is sharded in both inputs.** Each rank computes a partial sum. All-reduce the result if it is replicated, or reduce-scatter it if the result should be sharded.
 
 ```text
 b l e/tp, e/tp f -> b l f
+# all-reduce b l f
 ```
 
-`b l f` is a partial sum and needs to be all-reduced since the output is replicated across the `tp` ranks. If the output is sharded, then the collective is a reduce-scatter, for example, to `b l/tp f`.
-
-If the inner / contracting dimension is not sharded, then the operation computes the full result and does not require a reduce collective. For example:
+1. **A contracting dimension is sharded in only one input.** The local contracting dimensions do not match. All-gather the sharded input before the einsum. Alternatively, shard the other input the same way and apply rule 1.
 
 ```text
-b l e, e f/tp -> b l f/tp
+b l e/tp, e f -> invalid
+# all-gather the left input
+b l e, e f -> b l f
 ```
 
-Make sure local matmuls are legal and produce legal sharded tensors. If not, the sharded operation is either invalid or needs other collectives to ensure correctness. For example,
+1. **A free dimension is sharded.** The output inherits that shard. No collective is required. This includes a batch dimension that appears in only one input.
 
 ```text
-b l/cp e, e l'/cp -> b l/cp l'/cp
+b/dp l e, e f -> b/dp l f
 ```
 
-is illegal because the output is sharded twice across `cp` ranks, which is not allowed. The correct operation is:
+1. **A batch dimension is sharded in both inputs.** If the shards are aligned, the output inherits the batch shard. No collective is required.
 
 ```text
+b/dp l e, b/dp e f -> b/dp l f
+```
+
+1. **A shared batch dimension is sharded in only one input.** The label appears in both inputs, but their local sizes do not match. All-gather the sharded input, or shard the other input identically.
+
+```text
+b/tp l e, b e f -> invalid
+# all-gather the left input
+b l e, b e f -> b l f
+```
+
+1. **One mesh axis shards different free dimensions in the two inputs.** The output would use the same mesh axis twice, which is illegal. All-gather one input along that mesh axis.
+
+```text
+b l/cp e, e l'/cp -> b l/cp l'/cp  # illegal
+# all-gather the right input
 b l/cp e, e l' -> b l/cp l'
 ```
 
-which requires the second tensor / operand to be all-gathered first across the `cp` ranks.
+These rules apply per mesh axis. Apply them independently for multi-dimensional meshes, and verify that every local einsum has matching label sizes and produces a legal output layout.
 
 ## Backward Duals
 
-In training mode, the backward pass typically requires a the conjugate communication collectives of the forward operation, and when analyzing forward and backward matmuls, you can think of the same collective having two different roles in forward and backward, making it a differentiable operation. See `collectives.md` for the list of common differentiable collectives and their contracts.
+In training mode, the backward pass typically requires the conjugate communication collectives of the forward operation. When analyzing forward and backward einsums, the same collective can have different roles in each direction, making it a differentiable operation. See `collectives.md` for the list of common differentiable collectives and their contracts.
