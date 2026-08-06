@@ -17,13 +17,22 @@ comm_metadata = {
 
 - `sharded`: One entry per parameter tensor dimension. A string means that
   tensor dimension is partitioned across the named communication group. `None`
-  means that tensor dimension is local/full on each rank. Use `[]` only when the
-  parameter is intentionally treated as unsharded or the wrapper uses scalar
-  ownership rules.
+  means that tensor dimension is local/full on each rank. An unsharded
+  rank-`n` tensor uses `[None] * n`; `[]` is valid only for a scalar parameter
+  because its `ndim` is zero.
 - `shared`: Communication groups whose ranks hold replicated copies of this
   parameter. These groups must be synchronized after initialization.
 - `reduce`: Communication groups whose ranks must all-reduce this parameter's
   gradient in addition to ordinary data-parallel DDP.
+
+## Logical Versus Stored Layout
+
+Operation contracts use mathematical dimension order, while `sharded` always
+uses the actual parameter tensor's dimension order. Record the translation in
+the planning handoff before annotation. For example, a linear operation may use
+logical weight `e f`, but `torch.nn.Linear.weight` is stored as
+`(out_features=f, in_features=e)`. Sharding logical `f` therefore produces local
+storage `(f/tp, e)` and metadata `["tp", None]`.
 
 ## DP Convention
 
@@ -34,7 +43,8 @@ Do not encode ordinary data parallelism in every parameter's metadata. DDP over
 
 ## Shape Rules
 
-- `len(sharded)` should equal `param.ndim` for normal tensors.
+- `len(sharded)` must equal `param.ndim`, including zero-dimensional scalar
+  parameters.
 - A parameter of shape `(out_features, in_features)` sharded by output features
   uses `["tp", None]`.
 - A parameter of shape `(out_features, in_features)` sharded by input features

@@ -13,7 +13,8 @@ here.
 
 - Approved model and parallelism plan.
 - `comm.py` from the topology-and-groups skill.
-- `param.comm_metadata` annotations from the annotate-model skill.
+- Validated `param.comm_metadata` annotations and shared-parameter
+  initialization from the annotate-model skill.
 - Logical and per-rank tensor shapes.
 - Exact forward and backward equivalence requirements.
 
@@ -36,8 +37,10 @@ already present:
 3. Use `comm.get_size`, `comm.get_rank`, `comm.get_group`, and `comm.get_root`
    for all communicator access.
 4. Keep helper functions no-op for group size one.
-5. Ensure DDP or backward hooks consume `param.comm_metadata["reduce"]` for
-   non-DP gradient reductions.
+5. Implement and install the DDP or backward-hook path described in
+   `autograd-collectives.md`. This stage owns consuming
+   `param.comm_metadata["reduce"]` for non-DP gradient reductions; do not add
+   hooks during parameter annotation.
 6. Insert public mapping helpers at model tensor boundaries identified in the
    approved plan.
 7. Add or update correctness tests through the parallel-unit-tests skill.
@@ -76,6 +79,7 @@ Use `megatron-patterns.md` for placement details.
 - Helper primitives exist before layer edits.
 - Autograd mapping wrappers exist before layer edits.
 - Parameter annotations already exist and are not inferred inside mappings.
+- DDP or backward hooks consume every validated `reduce` entry exactly once.
 - Each sharded module documents logical shape and per-rank shape.
 - Each collective names its process group.
 - Backward behavior is explicit for every custom mapping.

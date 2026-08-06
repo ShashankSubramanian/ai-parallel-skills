@@ -11,8 +11,8 @@ Implement a helper such as `validate_param_comm_metadata(model)` that checks:
 - `sharded`, `shared`, and `reduce` are lists.
 - Every non-`None` group name appears in `comm.get_names()`.
 - `None` appears only in `sharded`.
-- For ordinary tensor parameters, `len(metadata["sharded"])` is either
-  `param.ndim` or an explicitly documented wrapper exception.
+- `len(metadata["sharded"]) == param.ndim`; scalar parameters therefore use
+  `[]`, while every unsharded dimension of a non-scalar parameter uses `None`.
 - If a parameter is sharded over group `g`, its corresponding tensor dimension
   matches the local shard shape expected by the plan.
 
@@ -33,4 +33,6 @@ Tests should verify:
 - No trainable parameters are missing metadata.
 - Unknown group names fail validation.
 - Shared parameters match across their `shared` groups after initialization.
-- Extra gradient reductions named in `reduce` are actually applied.
+- Every required extra gradient reduction is named by valid `reduce` metadata.
+  The parallel-mappings and parallel-unit-tests stages verify that those
+  reductions are actually applied.

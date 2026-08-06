@@ -9,7 +9,7 @@ function, full input, full target, scalar loss, and logical parameters.
 Use this order:
 
 1. Initialize the process group, device, and mesh groups. Assert that the mesh
-   product divides or equals world size as designed.
+   product equals world size.
 2. Seed CPU and accelerator RNGs identically on all ranks.
 3. Disable model-parallel group lookup for the baseline path if model
    constructors inspect global communication state.

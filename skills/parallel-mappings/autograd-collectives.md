@@ -56,6 +56,10 @@ The wrappers are the only functions model code should call directly.
 
 ## DDP Reduction Hooks
 
+The parallel-mappings stage owns implementation and installation of these
+hooks. The annotate-model stage only validates and initializes metadata; it
+must not install a competing reduction path.
+
 When parameters carry `comm_metadata`, provide a helper equivalent to
 `init_ddp_model_and_reduction_hooks(...)`:
 
@@ -68,6 +72,8 @@ When parameters carry `comm_metadata`, provide a helper equivalent to
 - Keep backend-specific DDP arguments explicit, especially for `gloo`.
 - Do not infer missing metadata in the hook. Missing metadata should fail during
   the annotate-model validation phase.
+- Ensure each extra reduction group named by a parameter is applied exactly once
+  and is not duplicated by another wrapper or hook.
 
 ## Correctness Expectations
 

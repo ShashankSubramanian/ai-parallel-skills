@@ -34,8 +34,10 @@ Keep the group list data-driven:
 groups_to_build = ["dp", "tp", "cp", "sp1", "sp2", "sp1-sp2", "tp-cp"]
 ```
 
-Choose the actual tokens from the approved plan and any module metadata that
-names shared, sharded, or reduced dimensions.
+Choose the actual tokens from the finalized topology handoff in the approved
+plan. That handoff must already contain the union of groups required by
+operation collectives and planned parameter metadata; live `param.comm_metadata`
+does not exist yet because annotation follows topology setup.
 
 ## Teardown
 

@@ -35,7 +35,7 @@ is usually unsharded but replicated across the model-parallel group:
 
 ```python
 bias.comm_metadata = {
-    "sharded": [],
+    "sharded": [None],
     "shared": ["tp-sp1-sp2"],
     "reduce": ["sp1-sp2"],
 }
@@ -66,13 +66,15 @@ partitioned:
 
 ```python
 conv.weight.comm_metadata = {
-    "sharded": [],
+    "sharded": [None, None, None, None],
     "shared": ["tp-sp1-sp2"],
     "reduce": ["sp1-sp2"],
 }
 ```
 
-Use the same metadata for bias unless the plan shards output channels.
+Use the same `shared` and `reduce` groups for bias unless the plan says
+otherwise. An unsharded one-dimensional bias uses `"sharded": [None]`; if the
+plan shards output channels, name that group instead.
 
 ## Positional Or Domain Parameters
 
