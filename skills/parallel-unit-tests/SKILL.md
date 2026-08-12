@@ -8,6 +8,15 @@ description: Adds correctness tests for AI model parallel implementations. Use t
 Use this skill after topology, parameter annotations, and mappings are
 implemented. Correctness tests must pass before optimization work.
 
+## Mandatory Test Skeleton
+
+Before writing or modifying any parallel correctness test, read
+`test-skeleton.md` in full and use it as the starting structure for the test.
+Do not create the test from scratch or merely consult the skeleton after
+implementation. Preserve its setup, baseline/distributed comparison, and
+assertion structure unless the target model requires a deviation; document the
+reason for every such deviation.
+
 ## Required Tests
 
 For a minimal representative model or layer, compare the single-device baseline
