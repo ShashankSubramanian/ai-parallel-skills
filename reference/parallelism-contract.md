@@ -65,13 +65,13 @@ b l e, e f -> b l f
 b/dp l e, e f -> b/dp l f
 ```
 
-1. **A batch dimension is sharded in both inputs.** If the shards are aligned, the output inherits the batch shard. No collective is required.
+2. **A batch dimension is sharded in both inputs.** If the shards are aligned, the output inherits the batch shard. No collective is required.
 
 ```text
 b/dp l e, b/dp e f -> b/dp l f
 ```
 
-1. **A shared batch dimension is sharded in only one input.** The label appears in both inputs, but their local sizes do not match. All-gather the sharded input, or shard the other input identically.
+3. **A shared batch dimension is sharded in only one input.** The label appears in both inputs, but their local sizes do not match. All-gather the sharded input, or shard the other input identically.
 
 ```text
 b/tp l e, b e f -> invalid
@@ -79,7 +79,7 @@ b/tp l e, b e f -> invalid
 b l e, b e f -> b l f
 ```
 
-1. **One mesh axis shards different free dimensions in the two inputs.** The output would use the same mesh axis twice, which is illegal. All-gather one input along that mesh axis.
+4. **One mesh axis shards different free dimensions in the two inputs.** The output would use the same mesh axis twice, which is illegal. All-gather one input along that mesh axis.
 
 ```text
 b l/cp e, e l'/cp -> b l/cp l'/cp  # illegal
