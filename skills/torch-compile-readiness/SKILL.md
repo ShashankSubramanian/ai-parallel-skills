@@ -23,11 +23,12 @@ trade a passing equivalence test for a faster graph.
 
 Two strategies exist and they are mutually exclusive. Decide before editing.
 
-1. **Region compilation.** Public mapping wrappers keep the
-   `@torch.compiler.disable` decorator required by
-   `../parallel-mappings/autograd-collectives.md`. Every collective becomes a
-   graph break and compute between collectives is fused. `fullgraph=True` is
-   impossible by construction. Compile the repeated block module rather than the
+1. **Region compilation.** Decorate every public mapping wrapper from
+   `../parallel-mappings/autograd-collectives.md` with
+   `@torch.compiler.disable`. Every collective becomes a graph break, and
+   compute between collectives
+   is fused. `fullgraph=True` is impossible by construction, and will raise
+   rather than break silently. Compile the repeated block module rather than the
    whole model so one graph is reused across depth. Prefer this strategy unless
    full-graph capture is an explicit requirement.
 2. **Fully traceable collectives.** Replace disabled wrappers with registered
@@ -39,16 +40,18 @@ within one model.
 
 ## Implementation Steps
 
-1. Convert forward-time checks to `torch._check` using `graph-safe-guards.md`.
-2. Hoist rank, size, and shard-shape lookups into construction-time constants,
+1. Apply the decorator or the port required by the chosen strategy. Mapping
+   wrappers arrive from `../parallel-mappings/SKILL.md` undecorated.
+2. Convert forward-time checks to `torch._check` using `graph-safe-guards.md`.
+3. Hoist rank, size, and shard-shape lookups into construction-time constants,
    also covered by `graph-safe-guards.md`.
-3. Remove tensor mutation and host synchronization from every path that will be
+4. Remove tensor mutation and host synchronization from every path that will be
    traced, per `traceable-collectives.md`.
-4. Audit rank-dependent control flow, recompilation, and backward hooks using
+5. Audit rank-dependent control flow, recompilation, and backward hooks using
    `distributed-compile-hazards.md`.
-5. Compile the chosen region and inspect the result with
+6. Compile the chosen region and inspect the result with
    `torch._dynamo.explain` or `TORCH_LOGS=graph_breaks`.
-6. Re-run the equivalence tests from `../parallel-unit-tests/SKILL.md` under
+7. Re-run the equivalence tests from `../parallel-unit-tests/SKILL.md` under
    compilation, not only under eager execution.
 
 ## Required Invariants

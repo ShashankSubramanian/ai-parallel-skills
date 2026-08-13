@@ -1,14 +1,16 @@
 # Traceable Collectives
 
 Use this subskill only when full-graph capture is an explicit requirement. It
-replaces the `@torch.compiler.disable` wrappers required by
+replaces the public mapping wrappers from
 `../parallel-mappings/autograd-collectives.md` with collectives the compiler can
-trace. Under region compilation, leave the wrappers disabled and skip to the
-mutation and synchronization rules at the end of this file.
+trace, instead of hiding them behind `@torch.compiler.disable`. Under region
+compilation, skip to the mutation and synchronization rules at the end of this
+file.
 
-## Cost of the Disabled-Wrapper Default
+## Cost of the Disabled-Wrapper Alternative
 
-Each disabled wrapper is one graph break in the forward and one in the backward.
+Under region compilation, each disabled wrapper is one graph break in the
+forward and one in the backward.
 A transformer with a tensor-parallel block and a context-parallel attention
 typically breaks four or five times per block, multiplied by depth. The compiler
 still fuses the compute between breaks, which is most of the available win. Pay
