@@ -53,6 +53,8 @@ The wrappers are the only functions model code should call directly.
 - Keep asynchronous collectives out of the first implementation unless the
   project already has a safe pattern.
 - Return `None` for all non-tensor backward arguments.
+- Use PyTorch 2.0 compatbile wrappers by implementing a member routine `setup_context` which takes care of storing relevant parameters and tensors for the backward pass.
+- For `torch.compile` compatibility, please decorate public wrapper functions with `@torch.compiler.disable` decorators.
 
 ## DDP Reduction Hooks
 

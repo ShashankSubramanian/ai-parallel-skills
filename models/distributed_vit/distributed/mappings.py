@@ -22,9 +22,13 @@ from .helpers import (
 
 class _IdentityForwardAllReduceBackward(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, input_: torch.Tensor, comm_name: str) -> torch.Tensor:
-        ctx.comm_name = comm_name
+    def forward(input_: torch.Tensor, comm_name: str) -> torch.Tensor:
         return input_
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        _, comm_name = inputs
+        ctx.comm_name = comm_name
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -33,8 +37,12 @@ class _IdentityForwardAllReduceBackward(torch.autograd.Function):
 
 class _AllReduceForwardIdentityBackward(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, input_: torch.Tensor, comm_name: str) -> torch.Tensor:
+    def forward(input_: torch.Tensor, comm_name: str) -> torch.Tensor:
         return _reduce(input_, comm_name)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        return None
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -43,18 +51,22 @@ class _AllReduceForwardIdentityBackward(torch.autograd.Function):
 
 class _BroadcastForwardReduceToRootBackward(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, input_: torch.Tensor, comm_name: str) -> torch.Tensor:
-        ctx.comm_name = comm_name
-        ctx.root = comm.get_root(comm_name)
+    def forward(input_: torch.Tensor, comm_name: str) -> torch.Tensor:
         if comm.get_size(comm_name) == 1:
             return input_
         output = input_.contiguous().clone()
         dist.broadcast(
             output,
-            src=ctx.root,
+            src=comm.get_root(comm_name),
             group=comm.get_group(comm_name),
         )
         return output
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        _, comm_name = inputs
+        ctx.comm_name = comm_name
+        ctx.root = comm.get_root(comm_name)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -66,19 +78,25 @@ class _BroadcastForwardReduceToRootBackward(torch.autograd.Function):
         return reduced, None
 
 
+def _setup_shard_context(ctx, inputs, output) -> None:
+    """Store the split dimension, shard shapes, and communicator name."""
+    _, dim, shapes, comm_name = inputs
+    ctx.dim = dim
+    ctx.shapes = shapes
+    ctx.comm_name = comm_name
+
+
 class _AllGatherForwardSplitBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         input_: torch.Tensor,
         dim: int,
         shapes: tuple[int, ...] | None,
         comm_name: str,
     ) -> torch.Tensor:
-        ctx.dim = dim
-        ctx.shapes = shapes
-        ctx.comm_name = comm_name
         return _gather(input_, dim, shapes, comm_name)
+
+    setup_context = staticmethod(_setup_shard_context)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -93,16 +111,14 @@ class _AllGatherForwardSplitBackward(torch.autograd.Function):
 class _SplitForwardAllGatherBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         input_: torch.Tensor,
         dim: int,
         shapes: tuple[int, ...] | None,
         comm_name: str,
     ) -> torch.Tensor:
-        ctx.dim = dim
-        ctx.shapes = shapes
-        ctx.comm_name = comm_name
         return _split(input_, dim, comm_name, shapes)
+
+    setup_context = staticmethod(_setup_shard_context)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -117,16 +133,14 @@ class _SplitForwardAllGatherBackward(torch.autograd.Function):
 class _ReduceScatterForwardAllGatherBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         input_: torch.Tensor,
         dim: int,
         shapes: tuple[int, ...] | None,
         comm_name: str,
     ) -> torch.Tensor:
-        ctx.dim = dim
-        ctx.shapes = shapes
-        ctx.comm_name = comm_name
         return _reduce_scatter(input_, dim, shapes, comm_name)
+
+    setup_context = staticmethod(_setup_shard_context)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -141,16 +155,14 @@ class _ReduceScatterForwardAllGatherBackward(torch.autograd.Function):
 class _AllGatherForwardReduceScatterBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         input_: torch.Tensor,
         dim: int,
         shapes: tuple[int, ...] | None,
         comm_name: str,
     ) -> torch.Tensor:
-        ctx.dim = dim
-        ctx.shapes = shapes
-        ctx.comm_name = comm_name
         return _gather(input_, dim, shapes, comm_name)
+
+    setup_context = staticmethod(_setup_shard_context)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -167,16 +179,19 @@ class _AllGatherForwardReduceScatterBackward(torch.autograd.Function):
 class RollForwardReverseRollBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         x: torch.Tensor,
         shift: int,
         dim: int,
         comm_name: str,
     ) -> torch.Tensor:
+        return _distributed_roll(x, shift, dim, comm_name)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        _, shift, dim, comm_name = inputs
         ctx.shift = shift
         ctx.dim = dim
         ctx.comm_name = comm_name
-        return _distributed_roll(x, shift, dim, comm_name)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -193,7 +208,6 @@ class RollForwardReverseRollBackward(torch.autograd.Function):
 class TransposeForwardTransposeBackward(torch.autograd.Function):
     @staticmethod
     def forward(
-        ctx,
         x: torch.Tensor,
         dim0: int,
         dim1: int,
@@ -201,11 +215,6 @@ class TransposeForwardTransposeBackward(torch.autograd.Function):
         dim1_split_sizes: tuple[int, ...],
         comm_name: str,
     ) -> torch.Tensor:
-        ctx.dim0 = dim0
-        ctx.dim1 = dim1
-        ctx.dim0_split_sizes = dim0_split_sizes
-        ctx.dim1_split_sizes = dim1_split_sizes
-        ctx.comm_name = comm_name
         return _transpose(
             x,
             dim0,
@@ -214,6 +223,15 @@ class TransposeForwardTransposeBackward(torch.autograd.Function):
             dim1_split_sizes,
             comm_name,
         )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        _, dim0, dim1, dim0_split_sizes, dim1_split_sizes, comm_name = inputs
+        ctx.dim0 = dim0
+        ctx.dim1 = dim1
+        ctx.dim0_split_sizes = dim0_split_sizes
+        ctx.dim1_split_sizes = dim1_split_sizes
+        ctx.comm_name = comm_name
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -238,24 +256,28 @@ def _shape_tuple(shapes: Sequence[int] | None) -> tuple[int, ...] | None:
     return tuple(shapes) if shapes is not None else None
 
 
+@torch.compiler.disable
 def identity_forward_allreduce_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _IdentityForwardAllReduceBackward.apply(input_, comm_name)
 
 
+@torch.compiler.disable
 def allreduce_forward_identity_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _AllReduceForwardIdentityBackward.apply(input_, comm_name)
 
 
+@torch.compiler.disable
 def broadcast_forward_reduce_to_root_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _BroadcastForwardReduceToRootBackward.apply(input_, comm_name)
 
 
+@torch.compiler.disable
 def allgather_forward_split_backward(
     input_: torch.Tensor,
     dim: int,
@@ -267,6 +289,7 @@ def allgather_forward_split_backward(
     )
 
 
+@torch.compiler.disable
 def split_forward_allgather_backward(
     input_: torch.Tensor,
     dim: int,
@@ -278,6 +301,7 @@ def split_forward_allgather_backward(
     )
 
 
+@torch.compiler.disable
 def reducescatter_forward_allgather_backward(
     input_: torch.Tensor,
     dim: int,
@@ -289,6 +313,7 @@ def reducescatter_forward_allgather_backward(
     )
 
 
+@torch.compiler.disable
 def allgather_forward_reducescatter_backward(
     input_: torch.Tensor,
     dim: int,
@@ -300,6 +325,7 @@ def allgather_forward_reducescatter_backward(
     )
 
 
+@torch.compiler.disable
 def roll_forward_reverseroll_backward(
     x: torch.Tensor,
     shifts: Sequence[int],
@@ -316,6 +342,7 @@ def roll_forward_reverseroll_backward(
     return output
 
 
+@torch.compiler.disable
 def transpose_forward_transpose_backward(
     x: torch.Tensor,
     dims: tuple[int, int],
