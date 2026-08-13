@@ -256,28 +256,24 @@ def _shape_tuple(shapes: Sequence[int] | None) -> tuple[int, ...] | None:
     return tuple(shapes) if shapes is not None else None
 
 
-@torch.compiler.disable
 def identity_forward_allreduce_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _IdentityForwardAllReduceBackward.apply(input_, comm_name)
 
 
-@torch.compiler.disable
 def allreduce_forward_identity_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _AllReduceForwardIdentityBackward.apply(input_, comm_name)
 
 
-@torch.compiler.disable
 def broadcast_forward_reduce_to_root_backward(
     input_: torch.Tensor, comm_name: str
 ) -> torch.Tensor:
     return _BroadcastForwardReduceToRootBackward.apply(input_, comm_name)
 
 
-@torch.compiler.disable
 def allgather_forward_split_backward(
     input_: torch.Tensor,
     dim: int,
@@ -289,7 +285,6 @@ def allgather_forward_split_backward(
     )
 
 
-@torch.compiler.disable
 def split_forward_allgather_backward(
     input_: torch.Tensor,
     dim: int,
@@ -301,7 +296,6 @@ def split_forward_allgather_backward(
     )
 
 
-@torch.compiler.disable
 def reducescatter_forward_allgather_backward(
     input_: torch.Tensor,
     dim: int,
@@ -313,7 +307,6 @@ def reducescatter_forward_allgather_backward(
     )
 
 
-@torch.compiler.disable
 def allgather_forward_reducescatter_backward(
     input_: torch.Tensor,
     dim: int,
@@ -325,7 +318,6 @@ def allgather_forward_reducescatter_backward(
     )
 
 
-@torch.compiler.disable
 def roll_forward_reverseroll_backward(
     x: torch.Tensor,
     shifts: Sequence[int],
@@ -342,7 +334,6 @@ def roll_forward_reverseroll_backward(
     return output
 
 
-@torch.compiler.disable
 def transpose_forward_transpose_backward(
     x: torch.Tensor,
     dims: tuple[int, int],
