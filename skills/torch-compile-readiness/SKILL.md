@@ -17,30 +17,52 @@ trade a passing equivalence test for a faster graph.
 - Passing eager-mode equivalence tests from `../parallel-unit-tests/SKILL.md`.
 - The compile target: which module is wrapped, and whether `fullgraph=True` is
   required.
-- Which tensor dimensions are static and which vary across steps.
+- Which tensor dimensions are static, which vary across steps, and how many
+  distinct values each varying dimension takes in a representative run.
+
+## Report Before Editing
+
+Produce the readiness report described in `readiness-report.md` before changing
+any file. The report states the tier the model reaches today, the tier it could
+reach, and the specific construct blocking each advance:
+
+| Tier | Name | Meaning |
+| ---: | --- | --- |
+| 0 | Eager only | No region of the step can be usefully compiled. |
+| 1 | Region compile | Blocks or subgraphs compile; collectives stay eager. |
+| 2 | Full graph | The whole step captures with `fullgraph=True`. |
+
+Save it to `compile-readiness.md` next to the parallelism plan, present it, and
+wait for the user to approve a target tier. A tier claimed without a named
+blocker holding the model there is not a finding; keep auditing until every
+claim cites a file and line.
 
 ## Choose the Compile Target First
 
-Two strategies exist and they are mutually exclusive. Decide before editing.
+The approved target tier selects the strategy. Tier 1 and tier 2 are mutually
+exclusive implementations; decide before editing.
 
-1. **Region compilation.** Decorate every public mapping wrapper from
+1. **Tier 1, region compilation.** Decorate every public mapping wrapper from
    `../parallel-mappings/autograd-collectives.md` with
-   `@torch.compiler.disable`. Every collective becomes a graph break, and
-   compute between collectives
-   is fused. `fullgraph=True` is impossible by construction, and will raise
-   rather than break silently. Compile the repeated block module rather than the
-   whole model so one graph is reused across depth. Prefer this strategy unless
+   `@torch.compiler.disable`.
+   Every collective becomes a graph break, and compute between collectives is
+   fused. `fullgraph=True` is impossible by construction, and will raise rather
+   than break silently. Compile the repeated block module rather than the whole
+   model so one graph is reused across depth. Prefer this strategy unless
    full-graph capture is an explicit requirement.
-2. **Fully traceable collectives.** Replace disabled wrappers with registered
-   custom operators or functional collectives so the whole step is one graph.
-   This is a project, not a cleanup. Follow `traceable-collectives.md`.
+2. **Tier 2, fully traceable collectives.** Replace disabled wrappers with
+   registered custom operators or functional collectives so the whole step is
+   one graph. This is a project, not a cleanup. Follow
+   `traceable-collectives.md`.
 
 Record the chosen strategy alongside the parallelism plan. Do not mix strategies
 within one model.
 
 ## Implementation Steps
 
-1. Apply the decorator or the port required by the chosen strategy. Mapping
+Start these only after the report is approved.
+
+1. Apply the decorator or the port required by the approved tier. Mapping
    wrappers arrive from `../parallel-mappings/SKILL.md` undecorated.
 2. Convert forward-time checks to `torch._check` using `graph-safe-guards.md`.
 3. Hoist rank, size, and shard-shape lookups into construction-time constants,
@@ -89,6 +111,8 @@ within one model.
 
 ## Output Requirements
 
+- `compile-readiness.md` exists, states the current and reachable tiers, and
+  cites a file and line for every blocker.
 - The chosen compile strategy is documented with the parallelism plan.
 - Traced forwards contain no host synchronization and no data-dependent raise.
 - Construction-time constants replace every forward-time topology query.
@@ -97,6 +121,7 @@ within one model.
 
 ## References
 
+- `readiness-report.md`
 - `graph-safe-guards.md`
 - `traceable-collectives.md`
 - `distributed-compile-hazards.md`
