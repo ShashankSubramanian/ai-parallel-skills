@@ -91,6 +91,7 @@ Use `megatron-patterns.md` for placement details.
 - `helpers.md`
 - `autograd-collectives.md`
 - `megatron-patterns.md`
+- `../torch-compile-readiness/SKILL.md`
 - `../../reference/collectives.md`
 - `../../reference/parallelism-contract.md`
 - `../../reference/example-parallelism.md`

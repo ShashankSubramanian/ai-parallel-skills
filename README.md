@@ -21,6 +21,7 @@ skills/
   annotate-model/          Marks trainable parameters with communication metadata.
   parallel-mappings/       Inserts collectives and autograd mappings.
   parallel-unit-tests/     Verifies forward, input-gradient, and weight-gradient equivalence.
+  torch-compile-readiness/ Makes the distributed model compatible with torch.compile.
 
 reference/
   model-contract.md        Logical tensor and operation contract notation.

@@ -1,0 +1,129 @@
+---
+name: torch-compile-readiness
+description: Makes distributed model-parallel code compatible with torch.compile. Use after mappings and collectives are implemented, to convert forward-time raises to torch._check, hoist rank and size lookups to construction-time constants, and choose between region compilation and fully traceable collectives.
+---
+
+# torch.compile Readiness
+
+Use this skill to audit and fix a distributed model for `torch.compile`. Run it
+after `../parallel-mappings/SKILL.md` has produced working collectives and
+mappings, and after eager equivalence tests pass. Correctness comes first; never
+trade a passing equivalence test for a faster graph.
+
+## Required Inputs
+
+- Implemented `distributed/helpers.py` and `distributed/mappings.py`.
+- Model code with collectives already placed at ownership boundaries.
+- Passing eager-mode equivalence tests from `../parallel-unit-tests/SKILL.md`.
+- The compile target: which module is wrapped, and whether `fullgraph=True` is
+  required.
+- Which tensor dimensions are static, which vary across steps, and how many
+  distinct values each varying dimension takes in a representative run.
+
+## Report Before Editing
+
+Produce the readiness report described in `readiness-report.md` before changing
+any file. The report states the tier the model reaches today, the tier it could
+reach, and the specific construct blocking each advance:
+
+| Tier | Name | Meaning |
+| ---: | --- | --- |
+| 0 | Eager only | No region of the step can be usefully compiled. |
+| 1 | Region compile | Blocks or subgraphs compile; collectives stay eager. |
+| 2 | Full graph | The whole step captures with `fullgraph=True`. |
+
+Save it to `compile-readiness.md` next to the parallelism plan, present it, and
+wait for the user to approve a target tier. A tier claimed without a named
+blocker holding the model there is not a finding; keep auditing until every
+claim cites a file and line.
+
+## Choose the Compile Target First
+
+The approved target tier selects the strategy. Tier 1 and tier 2 are mutually
+exclusive implementations; decide before editing.
+
+1. **Tier 1, region compilation.** Decorate every public mapping wrapper from
+   `../parallel-mappings/autograd-collectives.md` with
+   `@torch.compiler.disable`.
+   Every collective becomes a graph break, and compute between collectives is
+   fused. `fullgraph=True` is impossible by construction, and will raise rather
+   than break silently. Compile the repeated block module rather than the whole
+   model so one graph is reused across depth. Prefer this strategy unless
+   full-graph capture is an explicit requirement.
+2. **Tier 2, fully traceable collectives.** Replace disabled wrappers with
+   registered custom operators or functional collectives so the whole step is
+   one graph. This is a project, not a cleanup. Follow
+   `traceable-collectives.md`.
+
+Record the chosen strategy alongside the parallelism plan. Do not mix strategies
+within one model.
+
+## Implementation Steps
+
+Start these only after the report is approved.
+
+1. Apply the decorator or the port required by the approved tier. Mapping
+   wrappers arrive from `../parallel-mappings/SKILL.md` undecorated.
+2. Convert forward-time checks to `torch._check` using `graph-safe-guards.md`.
+3. Hoist rank, size, and shard-shape lookups into construction-time constants,
+   also covered by `graph-safe-guards.md`.
+4. Remove tensor mutation and host synchronization from every path that will be
+   traced, per `traceable-collectives.md`.
+5. Audit rank-dependent control flow, recompilation, and backward hooks using
+   `distributed-compile-hazards.md`.
+6. Compile the chosen region and inspect the result with
+   `torch._dynamo.explain` or `TORCH_LOGS=graph_breaks`.
+7. Re-run the equivalence tests from `../parallel-unit-tests/SKILL.md` under
+   compilation, not only under eager execution.
+
+## Required Invariants
+
+1. Use `torch._check` for every shape or value check inside a traced forward.
+   Do not use Python `assert` or `raise` there.
+2. Cache rank, size, and group lookups as attributes during construction. Do not
+   call `comm.get_rank`, `comm.get_size`, or `comm.get_group` inside a traced
+   forward.
+3. Validate configuration in `__init__`, where a normal `raise` is free and
+   reports a clear error before any graph is captured.
+4. Keep `.item()`, `.tolist()`, `.cpu()`, and Python `int()` or `float()`
+   conversions of tensors out of traced forwards.
+5. Return new tensors from traced code. Do not mutate a traced function's input
+   tensor in place.
+6. Keep every `dist.*_object` collective out of the model forward path. These
+   pickle through the host and can never be traced.
+7. Make every rank reach the same sequence of collectives and recompile at the
+   same step. Rank-divergent compilation deadlocks the job.
+8. Derive shard shapes from configuration during construction, not from tensor
+   shapes observed during forward.
+
+## Verification
+
+- `torch._dynamo.explain(model)(example_input)` reports the expected number of
+  graph breaks and no unexpected break reasons.
+- Under strategy 2, `torch.compile(model, fullgraph=True)` succeeds.
+- Forward output, input gradients, and weight gradients match the eager
+  distributed run within dtype-appropriate tolerances.
+- Every trainable parameter still receives a gradient on every rank after a
+  compiled backward. Deliberate zero-valued gradient edges are the common
+  casualty; see `distributed-compile-hazards.md`.
+- A recompilation triggered on one rank does not hang the job.
+- Step time and peak memory improve, or the compile is not worth its complexity.
+
+## Output Requirements
+
+- `compile-readiness.md` exists, states the current and reachable tiers, and
+  cites a file and line for every blocker.
+- The chosen compile strategy is documented with the parallelism plan.
+- Traced forwards contain no host synchronization and no data-dependent raise.
+- Construction-time constants replace every forward-time topology query.
+- Equivalence tests run in both eager and compiled modes.
+- Remaining graph breaks are listed with a reason rather than left implicit.
+
+## References
+
+- `readiness-report.md`
+- `graph-safe-guards.md`
+- `traceable-collectives.md`
+- `distributed-compile-hazards.md`
+- `../parallel-mappings/autograd-collectives.md`
+- `../parallel-unit-tests/SKILL.md`

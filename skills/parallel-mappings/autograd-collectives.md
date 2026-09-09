@@ -53,6 +53,13 @@ The wrappers are the only functions model code should call directly.
 - Keep asynchronous collectives out of the first implementation unless the
   project already has a safe pattern.
 - Return `None` for all non-tensor backward arguments.
+- Use PyTorch 2.0 compatible wrappers by implementing a member routine
+  `setup_context` which takes care of storing relevant parameters and tensors
+  for the backward pass. Keep `forward` free of the `ctx` argument.
+- Do not add `torch.compile` decorators or other compile-specific workarounds
+  here. The `../torch-compile-readiness/SKILL.md` stage owns that decision,
+  because the correct choice depends on whether the project needs full-graph
+  capture. This stage produces mappings that are correct under eager execution.
 
 ## DDP Reduction Hooks
 

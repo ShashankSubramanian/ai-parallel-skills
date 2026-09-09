@@ -56,6 +56,9 @@ and put the new implementation and its supporting code under
 - [ ] MUST implement helper functions for collectives and mappings using `../parallel-mappings/SKILL.md`.
 - [ ] MUST add equivalence tests for forward, input gradients, and weight gradients using `../parallel-unit-tests/SKILL.md`.
 - [ ] Run or document the correctness tests.
+- [ ] If the user wants `torch.compile`, MUST use `../torch-compile-readiness/SKILL.md`, and only after the eager correctness tests pass.
+- [ ] MUST save the readiness report: current tier, reachable tier, and per-blocker file and line, to a `compile-readiness.md` file.
+- [ ] MUST point the user to the readiness report and stop and wait for approval of a target tier before editing for compilation.
 
 ## Skill Routing
 
@@ -65,3 +68,4 @@ and put the new implementation and its supporting code under
 - Parameter annotations: `../annotate-model/SKILL.md`
 - Mappings/collectives: `../parallel-mappings/SKILL.md`
 - Tests: `../parallel-unit-tests/SKILL.md`
+- `torch.compile` readiness: `../torch-compile-readiness/SKILL.md`
