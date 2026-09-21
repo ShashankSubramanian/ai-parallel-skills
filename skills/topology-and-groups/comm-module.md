@@ -1,16 +1,20 @@
 # Comm Module
 
-Use this subskill to build the target project's `comm.py`. Keep it as the only
-place that initializes `torch.distributed` process groups.
+Use this subskill to build the target project's `comm.py`. It is the only place
+that selects the local device and initializes or destroys `torch.distributed`
+process groups for the new distributed implementation. The launcher starts the
+processes, but `comm.py` owns distributed initialization inside each process.
 
 ## Required State
 
 `comm.py` should keep a small registry:
 
 ```python
-_COMM_GROUPS: dict[str, dist.ProcessGroup] = {}
+_COMM_GROUPS: dict[str, dist.ProcessGroup | None] = {}
 _COMM_RANKS: dict[str, list[int]] = {}
 ```
+
+`None` is the group handle for a registered single-device communicator.
 
 If the project needs backend-specific variants, keep them explicit, for example
 `_COMM_GROUPS_GLOO`.
@@ -19,14 +23,21 @@ If the project needs backend-specific variants, keep them explicit, for example
 
 Implement an initialization path that:
 
-1. Initializes the default process group if the project owns launch setup.
-2. Reads planned dimensions and rank order from config or explicit arguments.
-3. Validates `world_size == product(active_dims)`.
-4. Constructs `RankGenerator(dimensions=..., order=...)`.
-5. Iterates over the planned group tokens, calls `rank_gen.get_ranks(token)`,
+1. Reads planned dimensions, rank order, and group tokens from config or
+   explicit arguments.
+2. Validates `world_size == product(active_dims)`.
+3. When `world_size == 1` and no distributed launcher is present, skips
+   `torch.distributed` initialization, registers every planned token with group
+   handle `None` and ranks `[0]`, and returns.
+4. Otherwise reads rank and local-rank settings provided by the launcher. For
+   CUDA/NCCL, selects the local CUDA device before process-group initialization.
+5. Initializes the default process group using the planned backend and launch
+   settings.
+6. Constructs `RankGenerator(dimensions=..., order=...)`.
+7. Iterates over the planned group tokens, calls `rank_gen.get_ranks(token)`,
    creates `dist.new_group(ranks)` for each rank list, and stores only the group
    containing the current rank in `_COMM_GROUPS[token]`.
-6. Stores the current rank's global rank list in `_COMM_RANKS[token]`.
+8. Stores the current rank's global rank list in `_COMM_RANKS[token]`.
 
 Keep the group list data-driven:
 
@@ -41,9 +52,10 @@ does not exist yet because annotation follows topology setup.
 
 ## Teardown
 
-Provide `destroy()` or an equivalent cleanup helper that clears registries and
-destroys project-owned process groups when appropriate. Do not destroy the
-default process group if the training framework owns it.
+Provide `destroy()` or an equivalent cleanup helper that destroys every
+subgroup and the default process group created by this module, then clears all
+registries. Skip process-group destruction when `torch.distributed` was not
+initialized for the single-device path.
 
 ## Model Integration
 

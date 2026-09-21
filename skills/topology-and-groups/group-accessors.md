@@ -22,15 +22,20 @@ def get_local_rank() -> int: ...
 
 ## Semantics
 
-- `get_group(comm_name)` raises a clear error if the named group was not built.
-- `get_size(comm_name)` returns `1` when distributed is unavailable or the group
-  is absent.
-- `get_rank(comm_name)` returns `0` when distributed is unavailable or the group
-  is absent.
+- Every accessor taking `comm_name` raises a clear error when the name was not
+  registered by `comm.py`.
+- `is_initialized(comm_name)` is true for every registered communicator,
+  including a single-device communicator whose group handle is `None`.
+- `get_group(comm_name)` returns `None` only for a registered single-device
+  communicator.
+- `get_size(comm_name)` returns `1` and `get_rank(comm_name)` returns `0` for a
+  registered single-device communicator.
 - `get_root(comm_name)` returns the minimum global rank in the group, or `0` for
   the single-rank case.
 - `get_ranks(comm_name)` returns the current rank's global rank list for that
   communicator.
+- World accessors return world size `1` and ranks `0` when the single-device
+  path skips `torch.distributed` initialization.
 - `get_local_rank()` should prefer `LOCAL_RANK` when present, then fall back to
   `world_rank % torch.cuda.device_count()` when CUDA is available.
 

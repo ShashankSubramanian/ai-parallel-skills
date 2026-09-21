@@ -30,6 +30,17 @@ fc2: b l f/tp, f/tp e -> b l e
 fc2 output: all-reduce over tp
 ```
 
+Sequence-parallel extension to tensor parallelism:
+
+```text
+mesh: tp
+mode: sequence_parallel=true
+eligible activations: b l/tp e
+group: reuse tp
+transitions: all-gather before an operation that needs the full sequence;
+             reduce-scatter when returning to sequence-sharded activations
+```
+
 Context parallel:
 
 ```text

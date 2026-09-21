@@ -67,15 +67,19 @@ Behavior:
 
 - Return the input unchanged when `comm.get_size(comm_name) == 1`.
 - Make tensors contiguous before collectives.
+- Do not mutate caller-owned input tensors. In particular, `_reduce` must
+  all-reduce a contiguous clone rather than the input tensor itself.
 - Use `comm.get_group(comm_name)` for every collective.
 - Use `comm.get_rank(comm_name)` to choose local split or output shape.
 - `_gather` must support uneven local shapes via `shapes_`.
 - `_reduce_scatter` must split along `dim_`, reduce, and keep the caller's local
-  shard.
+  shard. When the backend cannot reduce-scatter uneven shards directly, use an
+  all-reduce on a clone followed by the planned uneven split.
 
-## Required Spatial Helpers
+## Conditional Spatial Helpers
 
-Implement:
+Implement these helpers only when the approved plan requires distributed
+spatial roll or transpose:
 
 ```python
 def invert_permutation(sigma: list[int]) -> list[int]: ...
@@ -103,6 +107,14 @@ Behavior:
 - `_transpose` should split along `dim0`, use `dist.all_to_all`, and concatenate
   along `dim1`.
 - Both helpers must work as no-ops or local operations when group size is one.
+
+## Mutation And Aliasing
+
+Collective helpers must not modify tensors owned by their callers. A split
+utility may return views, but neither the utility nor later helper operations
+may mutate the source through those views. In-place communication is allowed
+only on helper-owned outputs or on DDP gradient buckets whose hook contract
+explicitly permits mutation.
 
 ## Parameter Metadata Boundary
 

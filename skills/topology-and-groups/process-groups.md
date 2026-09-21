@@ -10,6 +10,9 @@ Megatron-style hyperrectangle rank generator, then access them only through
 - Validate `world_size == product(active_dims)`.
 - Build groups by token with `RankGenerator.get_ranks(token)`.
 - Build one process group per rank list returned for each planned token.
+- Build exactly the complete token list from the approved topology handoff,
+  including its DP-composite candidates. Do not invent additional composite
+  groups during topology implementation.
 - Cache the current rank's group handle and global rank list in `comm.py`.
 - Add a debug print or structured summary that can be enabled during bring-up.
 

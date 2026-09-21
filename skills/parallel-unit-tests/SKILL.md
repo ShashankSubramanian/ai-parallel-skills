@@ -34,26 +34,31 @@ Test:
 
 ## Test Setup
 
-1. Seed all ranks deterministically.
-2. Create one full logical input and target. Every rank running a baseline must
+1. Initialize and access distributed state only through the implementation's
+   `comm.py`. Tests must also use `comm.destroy()` for teardown and must support
+   the launcher-free single-device path.
+2. Seed all ranks deterministically.
+3. Create one full logical input and target. Every rank running a baseline must
    see identical values; do not add the rank to these seeds.
-3. Run the baseline with model-parallel behavior disabled, even if the
+4. Run the baseline with model-parallel behavior disabled, even if the
    distributed process group is already initialized.
-4. Save cloned baseline outputs, differentiable-input gradients, and named
+5. Save cloned baseline outputs, differentiable-input gradients, and named
    parameter gradients.
-5. Compute local split shapes, including uneven shards caused by patching,
+6. Compute local split shapes, including uneven shards caused by patching,
    windows, padding, or sequence boundaries.
-6. Build the distributed model with local metadata and validate all required
-   communication groups.
-7. Attach and validate `comm_metadata`, install distributed wrappers/hooks, and
-   copy each full baseline parameter into its exact local shard.
-8. Split the full input and target into equivalent local tensors. Detach split
+7. Build the unwrapped distributed model with local metadata, validate all
+   required communication groups, and attach and validate `comm_metadata`.
+8. Copy each full baseline parameter into its exact local shard, then perform
+   shared-parameter initialization and validation.
+9. Install the selected DDP or FSDP wrapper and reduction hooks only after
+   parameter copying and shared initialization are complete.
+10. Split the full input and target into equivalent local tensors. Detach split
    inputs and re-enable gradients so their `.grad` fields are populated.
-9. Run the distributed forward and use a loss mathematically equivalent to the
+11. Run the distributed forward and use a loss mathematically equivalent to the
    baseline scalar loss. Account explicitly for local mean/sum reductions and
    any data-parallel gradient averaging.
-10. Reconstruct logical outputs, input gradients, and parameter gradients.
-11. Compare named tensors and shapes; use a flattened aggregate gradient check
+12. Reconstruct logical outputs, input gradients, and parameter gradients.
+13. Compare named tensors and shapes; use a flattened aggregate gradient check
     only as an additional summary.
 
 Keep the same operation order on every rank. If a baseline model must coexist

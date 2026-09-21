@@ -11,9 +11,8 @@ import os
 import unittest
 
 import torch
-import torch.distributed as dist
 
-# PROJECT: import model, topology, mappings, metadata validation, and loss APIs.
+# PROJECT: import comm, model, mappings, metadata validation, and loss APIs.
 
 
 SEED = 333
@@ -173,19 +172,17 @@ def baseline_communication_disabled():
 class TestParallelEquivalence(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # PROJECT: initialize process group and all mesh groups.
+        # PROJECT: comm.py owns device selection and all distributed setup.
         backend = os.getenv(
             "BACKEND", "nccl" if torch.cuda.is_available() else "gloo"
         )
-        initialize_topology(backend=backend)
-        cls.rank = dist.get_rank()
-        cls.world_size = dist.get_world_size()
-        cls.local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        comm.initialize(backend=backend)
+        cls.rank = comm.get_world_rank()
+        cls.world_size = comm.get_world_size()
+        cls.local_rank = comm.get_local_rank()
         cls.device = torch.device(
             f"cuda:{cls.local_rank}" if backend == "nccl" else "cpu"
         )
-        if cls.device.type == "cuda":
-            torch.cuda.set_device(cls.device)
 
         # PROJECT: assert mesh product/world-size and required group names.
         validate_topology()
@@ -193,9 +190,7 @@ class TestParallelEquivalence(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if dist.is_initialized():
-            dist.barrier()
-            dist.destroy_process_group()
+        comm.destroy()
 
     def test_forward_and_backward_equivalence(self):
         # Keep a tiny asymmetric case. Parameterize additional mesh/shape cases.
@@ -241,18 +236,19 @@ class TestParallelEquivalence(unittest.TestCase):
 
         validate_model_groups(distributed_model)  # PROJECT
         annotate_and_validate_comm_metadata(distributed_model)  # PROJECT
+
+        copy_logical_parameters(
+            baseline,
+            distributed_model,
+            split_plan.parameter_split_sizes,
+        )
+        synchronize_shared_parameters(distributed_model)  # PROJECT, if required
+        assert_shared_parameters_equal(distributed_model)  # PROJECT
+
         distributed_model = install_distributed_wrappers_and_hooks(
             distributed_model
         )
         local_module = getattr(distributed_model, "module", distributed_model)
-
-        copy_logical_parameters(
-            baseline,
-            local_module,
-            split_plan.parameter_split_sizes,
-        )
-        synchronize_shared_parameters(local_module)  # PROJECT, if required
-        assert_shared_parameters_equal(local_module)  # PROJECT
 
         # Split from the same full tensors. Make input_local a leaf so .grad is
         # directly available after backward.

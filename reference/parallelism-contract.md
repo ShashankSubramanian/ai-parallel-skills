@@ -7,7 +7,11 @@ If not specified, use the following conventions:
 - `tp`: tensor parallelism.
 - `cp`: context parallelism.
 - `sp`: spatial parallelism.
-- `seqp`: sequence parallelism.
+
+Sequence parallelism is written as `sequence_parallel=true`. It is an extension
+of tensor parallelism that shards eligible sequence activations with the
+existing `tp` group. It is not a separate mesh dimension: a sequence-parallel
+local shape may be written as `b l/tp e`.
 
 ## Device Mesh
 
@@ -92,3 +96,13 @@ These rules apply per mesh axis. Apply them independently for multi-dimensional 
 ## Backward Duals
 
 In training mode, the backward pass typically requires the conjugate communication collectives of the forward operation. When analyzing forward and backward einsums, the same collective can have different roles in each direction, making it a differentiable operation. See `collectives.md` for the list of common differentiable collectives and their contracts.
+
+For every trainable parameter, write its weight-gradient computation as an
+einsum of the saved activation and output gradient, then apply the sharding
+rules above to that wgrad einsum. A model-parallel group requires a wgrad
+reduction when its ranks hold the same local parameter shard but each rank
+computes a partial, non-duplicate gradient because the group shards a
+contracting label. If the wgrad instead inherits the parameter's shard along
+that group, the ranks hold different local gradients and must not reduce them
+together. When several mesh dimensions jointly require one reduction, name
+their combined group token.

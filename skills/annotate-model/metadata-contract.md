@@ -21,9 +21,11 @@ comm_metadata = {
   rank-`n` tensor uses `[None] * n`; `[]` is valid only for a scalar parameter
   because its `ndim` is zero.
 - `shared`: Communication groups whose ranks hold replicated copies of this
-  parameter. These groups must be synchronized after initialization.
-- `reduce`: Communication groups whose ranks must all-reduce this parameter's
-  gradient in addition to ordinary data-parallel DDP.
+  parameter in addition to data parallelism. These groups must be synchronized
+  after initialization.
+- `reduce`: Model-parallel groups whose ranks hold the same local parameter
+  shard but compute partial, non-duplicate gradients that must be all-reduced
+  in addition to ordinary data parallelism.
 
 ## Logical Versus Stored Layout
 
@@ -36,27 +38,30 @@ storage `(f/tp, e)` and metadata `["tp", None]`.
 
 ## DP Convention
 
-Do not encode ordinary data parallelism in every parameter's metadata. DDP over
-`dp` handles replicated model copies and the standard gradient all-reduce. Use
+Do not encode ordinary data parallelism in every parameter's metadata. The
+selected DDP or FSDP wrapper owns ordinary communication over `dp`. Use
 `reduce` only for extra model-parallel reductions such as `sp1-sp2`, `cp`, or
-`tp-sp1-sp2`.
+`tp-sp1-sp2`. FSDP's transient storage shards are not logical entries in
+`sharded`.
 
 ## Shape Rules
 
 - `len(sharded)` must equal `param.ndim`, including zero-dimensional scalar
   parameters.
-- A parameter of shape `(out_features, in_features)` sharded by output features
-  uses `["tp", None]`.
-- A parameter of shape `(out_features, in_features)` sharded by input features
-  uses `[None, "tp"]`.
-- A bias of shape `(features,)` sharded by features uses `["tp"]`.
-- A norm weight of shape `(features,)` replicated across model-parallel ranks
-  commonly uses `[None]`.
+- `None` means the corresponding stored parameter dimension is not sharded.
+- A group token means the corresponding stored parameter dimension is
+  partitioned across that group.
+- The local dimension size must match the planned global dimension size divided
+  by the group size, unless the approved plan specifies padding or uneven
+  sharding.
+- All entries follow the parameter's actual stored tensor order.
 
 ## Validation Rules
 
 - Every group name in `sharded`, `shared`, or `reduce` must be initialized by
   `comm.py`.
 - `None` is valid only inside `sharded`.
+- Every `reduce` group must span ranks that own the same local parameter shard,
+  and the planning wgrad contract must show why their gradients are partial.
 - Unknown parameters must not silently fall through. Either annotate them from
   the plan or explicitly mark them as unsharded with a documented default.

@@ -6,37 +6,41 @@ description: Builds Megatron-style hyperrectangle communication groups and a min
 # Topology And Groups
 
 Use this skill to implement communication structure before modifying model
-layers. Always create or copy a Megatron-style orthogonal rank generator and use
-it from a `comm.py` module.
+layers. Always create a target-project `comm.py` that owns local device
+selection, distributed initialization, subgroup creation, and teardown. Create
+or copy a Megatron-style orthogonal rank generator and use it from that module.
 
 ## Required Inputs
 
-- Approved parallelism plan.
-- World size and rank launch method.
-- Chosen hyperrectangle dimensions such as `dp`, `tp`, `cp`, `sp1`, and `sp2`.
-- Explicit rank order such as `tp-cp-dp` or `sp1-sp2-tp-dp`.
-- Existing distributed utilities and initialization path.
-- Hardware topology assumptions when available.
+- Approved parallelism plan from `parallelism-planning`.
+- World size and rank launch method from `parallelism-planning`.
+- Chosen hyperrectangle dimensions such as `dp`, `tp`, `cp`, `sp1`, and `sp2` from `parallelism-planning`.
+- Explicit rank order such as `tp-cp-dp` or `sp1-sp2-tp-dp` from `parallelism-planning`.
+- Finalized group-token list, including DP-composite candidates, from
+  `parallelism-planning`.
+- Hardware topology assumptions when available from `parallelism-planning`.
 
 ## Implementation Steps
 
 1. Implement the rank generator from `rank-generator.md`. This should be copied
    or adapted from Megatron's `generate_masked_orthogonal_rank_groups` and
    `RankGenerator` pattern.
-2. Implement a target-project `comm.py` from `comm-module.md`.
-3. Put all `torch.distributed.new_group(...)` calls inside `comm.py`; do not
-   scatter rank math or group creation through model layers.
-4. Build every requested group by token name, for example `dp`, `tp`, `cp`,
-   `sp1`, `sp2`, `sp1-sp2`, `tp-cp`, or `dp-sp1-sp2`.
+2. Test the pure rank generator against the expected memberships before
+   initializing distributed communication.
+3. Implement a target-project `comm.py` from `comm-module.md`. It MUST own all
+   distributed initialization for the new distributed implementation.
+4. Use `process-groups.md` to build every requested group inside `comm.py` by
+   token name, for example `dp`, `tp`, `cp`, `sp1`, `sp2`, `sp1-sp2`,
+   `tp-cp`, or `dp-sp1-sp2`. Do not scatter rank math or group creation
+   through model layers.
 5. Expose only the accessors in `group-accessors.md` to model code.
 6. Validate `world_size == product(active_dims)` and every sharded tensor
    dimension is divisible by the matching group size unless padding is planned.
-7. Add rank membership tests using `process-groups.md`.
+7. Add multi-rank tests for process-group membership and accessors.
 
 ## Required Artifact Shape
 
-The target project should end with this split unless an existing equivalent is
-already present:
+The target project must contain this split:
 
 - `rank_generator.py`: pure rank math, no distributed side effects.
 - `comm.py`: distributed initialization, group registry, and accessors.
@@ -65,7 +69,8 @@ index. This is the Megatron rule:
 - A single source of truth for rank math and process groups.
 - A `comm.py` with `get_group`, `get_size`, `get_rank`, `get_root`, and world
   accessors.
-- Clear initialization and teardown behavior.
+- `comm.py` owns local device selection, the default process group when
+  `world_size > 1`, all requested subgroups, and teardown.
 - Shape/world-size assertions close to setup.
 - No collectives inserted until group handles are available.
 - Single-device behavior preserved.

@@ -8,8 +8,9 @@ function, full input, full target, scalar loss, and logical parameters.
 
 Use this order:
 
-1. Initialize the process group, device, and mesh groups. Assert that the mesh
-   product equals world size.
+1. Initialize the device, default process group when needed, and mesh groups
+   through the implementation's `comm.py`. Assert that the mesh product equals
+   world size.
 2. Seed CPU and accelerator RNGs identically on all ranks.
 3. Disable model-parallel group lookup for the baseline path if model
    constructors inspect global communication state.
@@ -19,15 +20,17 @@ Use this order:
 7. Compute local split shapes before constructing the distributed model. Patch,
    window, padding, and domain rules can make shards uneven.
 8. Split global metadata consistently with the input.
-9. Build the distributed model, validate every referenced group, attach and
-   validate `comm_metadata`, and install shared/reduction hooks.
-10. Copy baseline parameters into exact local shards.
-11. Split input and target across each applicable mesh axis.
-12. Run distributed forward and backward.
-13. Reconstruct and compare output, input gradients, and named weight
+9. Build the unwrapped distributed model, validate every referenced group, and
+   attach and validate `comm_metadata`.
+10. Copy baseline parameters into exact local shards, then initialize and
+    validate shared parameters.
+11. Install the selected DDP or FSDP wrapper and reduction hooks.
+12. Split input and target across each applicable mesh axis.
+13. Run distributed forward and backward.
+14. Reconstruct and compare output, input gradients, and named weight
    gradients.
-14. Synchronize if needed, then destroy the process group in class/module
-   teardown.
+15. Call `comm.destroy()` in class/module teardown. Do not directly initialize
+    or destroy process groups outside `comm.py`.
 
 Run the baseline on every rank when that keeps the test simple. Because all
 ranks use the same seed and model-parallel behavior is disabled, each rank gets

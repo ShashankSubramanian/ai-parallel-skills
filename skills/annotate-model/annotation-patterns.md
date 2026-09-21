@@ -1,7 +1,7 @@
 # Annotation Patterns
 
 Use this subskill to map common model modules to `comm_metadata`. Choose the
-actual group names from the approved plan.
+actual group names from the approved plan. Below are some common patterns.
 
 ## Tensor-Parallel Linear
 

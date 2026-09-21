@@ -31,6 +31,25 @@ Cons:
 - Adds collectives on forward or backward paths.
 - Shape divisibility and layout assumptions become part of the API.
 
+## Sequence Parallelism
+
+Sequence parallelism is an extension of tensor parallelism. It shards eligible
+activations over the sequence dimension using the existing `tp` group; it does
+not add another mesh dimension or process group. Keep it disabled unless TP is
+already required and the expected activation-memory reduction justifies the
+extra layout transitions and bookkeeping.
+
+Pros:
+
+- Reduces activation memory for operations such as normalization, dropout, and
+  residual computation.
+- Can replace some replicated TP activation regions with sequence shards.
+
+Cons:
+
+- Requires all-gather and reduce-scatter transitions at TP boundaries.
+- Applies only where operations preserve independent sequence positions.
+
 ## Context Parallelism
 
 Pros:

@@ -26,7 +26,7 @@ param.comm_metadata = {
 - `comm.py` group names from the topology-and-groups skill.
 - Logical operation shapes plus actual global and per-rank parameter tensor
   shapes from the planning handoff.
-- Training wrapper strategy, usually DDP over `dp`.
+- Selected data-parallel wrapper (`DDP` or `FSDP`).
 
 ## Implementation Steps
 
@@ -63,6 +63,9 @@ param.comm_metadata = {
 - Do not copy shard-axis positions from logical einsum notation. Match them to
   the actual parameter layout reported by the target framework; for example,
   `torch.nn.Linear` stores logical `e f` as `(f, e)`.
+- FSDP's transient data-parallel storage sharding is not a logical model
+  parameter shard and must not be added to `sharded`. Complete annotation,
+  validation, and shared initialization before FSDP wrapping.
 
 ## Output Requirements
 
