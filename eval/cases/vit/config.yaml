@@ -1,0 +1,24 @@
+model:
+  image_size: [720, 1440]
+  patch_size: 2
+  in_channels: 71
+  num_classes: 10
+  dim: 1024
+  depth: 24
+  heads: 16
+  mlp_ratio: 4.0
+  dropout: 0.0
+
+data:
+  num_samples: 1
+  global_batch_size: 1
+  shuffle: false
+
+training:
+  epochs: 1
+  precision: bfloat16
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.01
+  activation_checkpointing: false
+  seed: 333

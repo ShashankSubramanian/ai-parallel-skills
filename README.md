@@ -5,7 +5,7 @@ spatial parallelism to model code.
 
 Start with `skills/ai-parallelism-master/SKILL.md`. The master skill routes the
 agent through model analysis, parallelism planning, topology setup, parameter
-annotation, collective mappings, and equivalence tests.
+annotation, collective mappings, equivalence tests, and a test/train launcher.
 
 Pipeline parallelism, profiling, and full example projects are out of scope for
 now.
@@ -29,9 +29,15 @@ reference/
   example-parallelism.md   MLP, attention, and conv sharding examples.
   collectives.md           Collective operations and forward/backward duals.
 
-models/
-  vit.py                   Minimal Vision Transformer used for examples and checks.
+eval/
+  cases/                   Immutable model, config, trainer, and prompt inputs.
+  runs/                    Self-contained agent attempts and results.
+  assignments.yaml         Small case, run, compute, and review assignments.
 ```
+
+Each target workspace supplies a model implementation, fixed configuration, and
+single-device training entry point. The agent leaves those inputs unchanged and
+creates a standalone `distributed/` directory beside them.
 
 ## Workflow
 
@@ -45,6 +51,8 @@ models/
    correctness tests.
 7. Verify the distributed version matches the single-device version for forward
    outputs, input gradients, and weight gradients.
+8. Create `distributed/launch.sh` with `test` and `train` modes, then write the
+   final implementation report.
 
 ## Scope
 

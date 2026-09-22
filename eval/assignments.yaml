@@ -1,0 +1,9 @@
+assignments:
+  - id: vit-reference-run
+    case: vit
+    task: Run model parallel ViT case
+    status: ready
+    run_id: vit-reference-run-r1
+
+# Add one entry for each independent case-authoring, agent-running,
+# compute-running, or review task. Keep detailed outcomes in the run snapshot.
