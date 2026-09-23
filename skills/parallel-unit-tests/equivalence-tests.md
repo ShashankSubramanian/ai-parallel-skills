@@ -196,9 +196,21 @@ command, for example:
 torchrun --standalone --nproc-per-node=4 -m pytest -s tests/test_parallel_equivalence.py
 ```
 
-For scheduler/container launchers, compute tasks per node from the mesh and
+By default, assume SLURM is used with the following launch profile: compute tasks per node from the mesh and
 export mesh sizes in the launched process. Suppress duplicate pytest summaries
 on nonzero ranks if useful, but never suppress assertion failures.
+
+Example:
+
+```bash
+export NVIDIA_TF32_OVERRIDE=0
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | awk 'NR==1 {print; exit}')
+srun --nodes="$NNODES" --ntasks="$NNODES" --ntasks-per-node=1 \
+  --gpus-per-node="$NPROC_PER_NODE" \
+  torchrun --nnodes="$NNODES" --nproc-per-node="$NPROC_PER_NODE" \
+    --rdzv-backend=c10d --rdzv-endpoint="$MASTER_ADDR:$MASTER_PORT" \
+    -m pytest -s tests/test_parallel_equivalence.py
+```
 
 Include at least:
 

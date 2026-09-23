@@ -1,6 +1,6 @@
 ---
 name: ai-parallelism-master-skill
-description: Orchestrates AI model training parallelism work. Use when a user wants to parallelize training for an AI model. The agent must analyze the target model, plan the parallelism strategy, wait for approval, then implement communication groups, parameter annotations, mappings, and equivalence tests. Inference-only parallelism and pipeline parallelism are out of scope.
+description: Orchestrates AI model training parallelism work. Use when a user wants to parallelize training for an AI model. The agent must analyze the target model, plan the parallelism strategy, wait for approval, then implement communication groups, parameter annotations, mappings, equivalence tests, and a test/train launcher. Inference-only parallelism and pipeline parallelism are out of scope.
 ---
 
 # AI Parallelism Master
@@ -11,30 +11,31 @@ workflow checklist below.
 
 ## Required Model Information Gate
 
-Before beginning analysis, explicitly ask the user to provide or identify the
-following minimal information about the model. Do not begin analysis until each
-item has been supplied by the user or located in user-identified model code or
-configuration files:
+Before beginning analysis, explicitly ask the user to provide or identify all
+three input artifacts below and read them in full:
 
-- The model implementation and forward entry point
-- One fixed representative architecture configuration, with concrete values
-  for every model dimension used in the analysis
-- Representative input and target shapes
-- Precision, optimizer, and activation-checkpointing settings
-- Dynamic dimension ranges and relevant divisibility constraints
+- The model implementation containing the forward entry point.
+- One fixed representative configuration file with concrete architecture,
+  input, target, precision, optimizer, checkpointing, and dynamic-dimension
+  values or ranges.
+- The single-device training entry point that consumes that configuration.
 
-Fixed dimensions may be read from model code or configuration files if the user
-points to them. The analysis must calculate shapes, memory, and FLOPs for this
-one representative configuration. Possible future model configurations may be
-considered during planning, but they do not replace the fixed analysis.
+Also read any files directly imported by those artifacts that define model or
+training semantics. Do not begin analysis while an artifact is missing or while
+required values remain unresolved; ask the user instead of inventing defaults.
+The analysis must calculate shapes, memory, and FLOPs for the one representative
+configuration. Possible future configurations may be considered during
+planning, but they do not replace the fixed analysis.
 
 ## Required Output Location
 
-Use `models/distributed_<model>/`, where `<model>` is the target model's existing
-name, for the distributed implementation. If the directory does not exist,
-create it. If it already exists, inspect it and ask the user whether to reuse it
-or choose a different directory. Do not overwrite or delete existing artifacts
-without explicit user approval.
+Identify the target workspace that contains the supplied model, configuration,
+and training entry point. If the artifacts are in different directories or the
+workspace is ambiguous, ask the user to choose it. Use
+`<target-workspace>/distributed/` for every artifact produced by this workflow.
+If `distributed/` already exists, inspect it and ask the user whether to reuse
+it or choose a different target workspace. Do not overwrite or delete existing
+artifacts without explicit user approval.
 
 Keep all artifacts produced by this workflow in that directory, including:
 
@@ -42,46 +43,88 @@ Keep all artifacts produced by this workflow in that directory, including:
 - `parallelism-plan.md`
 - The complete distributed model implementation
 - Communication topology, groups, collectives, and mappings
-- Distributed launch and training code
+- Distributed training code
+- `launch.sh`
 - Equivalence and distributed unit tests
 - `implementation-report.md`
 
-Do not write analysis or planning files at the repository root. Do not place
-distributed implementation code into the original model directory or modify the
-original single-device implementation. Use the original model as the baseline
-and put the new implementation and its supporting code under
-`models/distributed_<model>/`.
+Do not modify the supplied model, configuration, or single-device training
+files. Use them as the immutable baseline and put the complete distributed
+implementation and all supporting artifacts under the target workspace's
+`distributed/` directory.
+
+## Required Launch Interface
+
+After implementing the distributed training path and correctness tests, create
+`<target-workspace>/distributed/launch.sh` as the user-facing entry point. It
+MUST:
+
+- support `test` and `train` modes and print usage with `--help`;
+- launch the generated distributed correctness tests in `test` mode;
+- launch the generated distributed training entry point in `train` mode;
+- accept or document the process count, node/rendezvous values, backend, and
+  implemented parallel degrees;
+- validate that world size and parallel degrees form a supported mesh, with a
+  clear error for invalid combinations;
+
+### Launch Profile 
+
+By default, assume SLURM is used with the following launch profile:
+
+- be invoked once inside the allocation and use `srun` to start exactly one
+  `torchrun` agent per node (`--ntasks-per-node=1`);
+- use `--rdzv-backend=c10d` and the first allocated hostname as the rendezvous
+  endpoint. 
+- export `NVIDIA_TF32_OVERRIDE=0` before `srun` for equivalence tests and ensure
+  Slurm and Shifter propagate it;
+
+The generated structure is:
+
+```bash
+export NVIDIA_TF32_OVERRIDE=0 # for equivalence tests
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | awk 'NR==1 {print; exit}')
+srun --nodes="$NNODES" --ntasks="$NNODES" --ntasks-per-node=1 \
+  --gpus-per-node="$NPROC_PER_NODE" \
+  torchrun --nnodes="$NNODES" --nproc-per-node="$NPROC_PER_NODE" \
+    --rdzv-backend=c10d --rdzv-endpoint="$MASTER_ADDR:$MASTER_PORT" \
+    ...
+```
+
+
 
 ## Workflow Checklist
 
-- [ ] Read the target model, training loop, optimizer, distributed launch path (if any), and existing tests (if any).
+- [ ] Read the supplied model, fixed configuration, single-device training
+  entry point, optimizer path, and existing tests (if any).
 - [ ] Record the fixed representative model configuration used for all numeric
   analysis.
 - [ ] MUST use `../model-analysis/SKILL.md` to produce the model shapes, memory consumed.
 - [ ] MUST save the analysis—shapes, memory, and bottlenecks—to
-  `models/distributed_<model>/analysis.md`.
+  `distributed/analysis.md` in the target workspace.
 - [ ] MUST use `../parallelism-planning/SKILL.md` to choose the parallelism strategy
 - [ ] MUST keep data parallelism as an explicit mesh dimension in every plan;
   use `dp=1` when it is a no-op, and scale `dp` by default when additional
   devices and the global batch permit.
 - [ ] MUST save the plan: shapes, memory, bottleneck, sharding, collectives,
   parameter metadata handoff, tradeoffs, and tests to
-  `models/distributed_<model>/parallelism-plan.md`.
+  `distributed/parallelism-plan.md` in the target workspace.
 - [ ] MUST point user to the above analysis and plan files and stop and wait for explicit user approval.
-- [ ] MUST implement all distributed code under
-  `models/distributed_<model>/`.
+- [ ] MUST implement all distributed code under the target workspace's
+  `distributed/` directory.
 - [ ] MUST implement communication groups (topology) using `../topology-and-groups/SKILL.md`.
 - [ ] MUST annotate every trainable parameter with `comm_metadata` using `../annotate-model/SKILL.md`.
 - [ ] MUST implement helper functions for collectives and mappings using `../parallel-mappings/SKILL.md`.
 - [ ] MUST add equivalence tests for forward, input gradients, and weight gradients using `../parallel-unit-tests/SKILL.md`.
 - [ ] Run or document the correctness tests.
+- [ ] MUST create `distributed/launch.sh` in the target workspace with the required
+  `test`, `train`, and `--help` interface.
 - [ ] If the user wants `torch.compile`, MUST use `../torch-compile-readiness/SKILL.md`, and only after the eager correctness tests pass.
   - [ ] MUST save the readiness report: current tier, reachable tier, and
-    per-blocker file and line, to `models/distributed_<model>/compile-readiness.md`.
+    per-blocker file and line, to `distributed/compile-readiness.md`.
   - [ ] MUST point the user to the readiness report and stop and wait for
     approval of a target tier before editing for compilation.
 - [ ] At the end of the workflow, MUST save
-  `models/distributed_<model>/implementation-report.md` with the implemented
+  `distributed/implementation-report.md` with the implemented
   strategy and parallel degrees, files produced, tests run and their results,
   supported and unsupported configurations, remaining assumptions, and every
   unverified claim.

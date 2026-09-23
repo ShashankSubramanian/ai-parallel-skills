@@ -8,6 +8,19 @@ description: Analyzes AI model code before parallelization. Use to identify inpu
 Use this skill before choosing parallelism. Keep the output compact enough that
 the planning skill can use it directly.
 
+## Read the Supplied Training Contract
+
+Before tracing shapes, read the supplied model implementation, fixed
+configuration file, and single-device training entry point in full. Follow
+their direct imports when those files define the model, loss, optimizer,
+precision, checkpointing, input construction, or target construction. Treat
+these supplied files as the baseline contract and do not modify them.
+
+Resolve the forward entry point and every value needed for the representative
+training step from those files. If they disagree or omit a required value,
+report the conflict or missing input and ask the user; do not silently choose a
+default.
+
 ## Fix the Representative Configuration
 
 Before tracing shapes, record one fixed representative model configuration and

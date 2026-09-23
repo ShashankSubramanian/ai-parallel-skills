@@ -1,0 +1,8 @@
+run_id: vit-reference-run-r1
+assignment: vit-reference-run
+case: vit
+agent: null
+model: null
+replicate: 1
+base_commit: null
+status: ready

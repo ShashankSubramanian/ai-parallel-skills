@@ -71,7 +71,7 @@ class Block(nn.Module):
 class VisionTransformer(nn.Module):
     def __init__(
         self,
-        image_size: int = 224,
+        image_size: int | tuple[int, int] = 224,
         patch_size: int = 16,
         in_channels: int = 3,
         num_classes: int = 1000,
@@ -82,10 +82,16 @@ class VisionTransformer(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        if image_size % patch_size != 0:
-            raise ValueError("image_size must be divisible by patch_size")
+        if isinstance(image_size, int):
+            image_height, image_width = image_size, image_size
+        else:
+            image_height, image_width = image_size
+        if image_height % patch_size != 0 or image_width % patch_size != 0:
+            raise ValueError("image dimensions must be divisible by patch_size")
 
-        num_patches = (image_size // patch_size) ** 2
+        num_patches = (
+            (image_height // patch_size) * (image_width // patch_size)
+        )
         self.patch_embed = nn.Conv2d(
             in_channels,
             dim,
