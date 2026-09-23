@@ -93,6 +93,14 @@ Provide `init_ddp_model_and_reduction_hooks(...)` with this behavior:
 
 Hook implementation rules:
 
+- Annotate the hook bucket as the runtime object `torch.distributed.GradBucket`
+  and its return as `torch.futures.Future[torch.Tensor]`. DDP validates these
+  annotations by identity in supported PyTorch releases. Do not use
+  `from __future__ import annotations` in the module containing an annotated
+  DDP hook, because it converts them to strings and causes
+  `register_comm_hook` to reject the hook. If postponed annotations are
+  unavoidable, leave the hook annotations empty or explicitly replace its
+  `__annotations__` entries with the runtime objects before registration.
 - Pair `bucket.parameters()` with `bucket.gradients()`; do not branch on
   locally observed `param.grad`.
 - Require identical DDP bucket layouts across all ranks participating in an
@@ -110,6 +118,9 @@ Hook implementation rules:
 - Support unused-parameter handling without changing collective participation
   based on rank-local `None` gradients.
 - Do not infer missing metadata. Annotation validation must fail first.
+- Before a distributed launch, add a compatibility check that registers the
+  hook on the target PyTorch version; a static type check alone cannot catch
+  postponed runtime annotations.
 
 ## FSDP Gradient Reduction
 

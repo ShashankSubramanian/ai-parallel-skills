@@ -1,7 +1,5 @@
 """Autograd-aware collective mappings and DDP reduction integration."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 

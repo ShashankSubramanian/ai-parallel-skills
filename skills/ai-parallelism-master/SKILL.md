@@ -66,7 +66,29 @@ MUST:
   implemented parallel degrees;
 - validate that world size and parallel degrees form a supported mesh, with a
   clear error for invalid combinations;
-- avoid assumptions about a particular scheduler.
+
+### Launch Profile 
+
+By default, assume SLURM is used with the following launch profile:
+
+- be invoked once inside the allocation and use `srun` to start exactly one
+  `torchrun` agent per node (`--ntasks-per-node=1`);
+- use `--rdzv-backend=c10d` and the first allocated hostname as the rendezvous
+  endpoint. 
+- export `NVIDIA_TF32_OVERRIDE=0` before `srun` for equivalence tests and ensure
+  Slurm and Shifter propagate it;
+
+The generated structure is:
+
+```bash
+export NVIDIA_TF32_OVERRIDE=0 # for equivalence tests
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | awk 'NR==1 {print; exit}')
+srun --nodes="$NNODES" --ntasks="$NNODES" --ntasks-per-node=1 \
+  --gpus-per-node="$NPROC_PER_NODE" \
+  torchrun --nnodes="$NNODES" --nproc-per-node="$NPROC_PER_NODE" \
+    --rdzv-backend=c10d --rdzv-endpoint="$MASTER_ADDR:$MASTER_PORT" \
+    ...
+```
 
 
 

@@ -44,6 +44,9 @@ already present:
    `autograd-collectives.md`. This stage owns consuming
    `param.comm_metadata["reduce"]` for non-DP gradient reductions; do not add
    a competing reduction path during parameter annotation.
+   For DDP hooks, preserve runtime `dist.GradBucket` and
+   `torch.futures.Future[torch.Tensor]` annotations: do not postpone them into
+   strings with `from __future__ import annotations`.
 6. Insert public mapping helpers at model tensor boundaries identified in the
    approved plan.
 7. Add or update correctness tests through the parallel-unit-tests skill.

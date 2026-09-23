@@ -58,7 +58,7 @@ TARGET_DIR=$(dirname -- "$SCRIPT_DIR")
 NNODES=8
 NPROC_PER_NODE=4
 NODE_RANK=0
-MASTER_ADDR=127.0.0.1
+MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 MASTER_PORT=29500
 BACKEND=nccl
 DP=1
@@ -140,15 +140,22 @@ export BACKEND
 export DP_SIZE=$DP
 export TP_SIZE=$TP
 export CP_SIZE=$CP
+export NVIDIA_TF32_OVERRIDE=0
 if (( REALISTIC_SHAPE == 1 )); then
   export RUN_REALISTIC_SHAPE=1
 fi
 
 TORCHRUN=(
+  srun
+  --nodes="$NNODES"
+  --ntasks-per-node=1
+  --gpus-per-node=4
+  --cpus-per-task=128
+  shifter
+  --image=registry.nersc.gov/dasrepo/shas1693/sciml-pytorch:26.07
   torchrun
   --nnodes="$NNODES"
-  --nproc-per-node="$NPROC_PER_NODE"
-  --node-rank="$NODE_RANK"
+  --nproc-per-node=4
   --rdzv-backend=c10d
   --rdzv-endpoint="$MASTER_ADDR:$MASTER_PORT"
 )

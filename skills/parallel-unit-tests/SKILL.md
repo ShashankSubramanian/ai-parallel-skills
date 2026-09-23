@@ -37,8 +37,11 @@ Test:
 1. Initialize and access distributed state only through the implementation's
    `comm.py`. Tests must also use `comm.destroy()` for teardown and must support
    the launcher-free single-device path.
-2. Seed all ranks deterministically.
-3. Create one full logical input and target. Every rank running a baseline must
+2. For CUDA FP32 equivalence tests, export `NVIDIA_TF32_OVERRIDE=0` in the
+   launcher before any worker process starts. Ensure scheduler and container
+   boundaries propagate it; setting it after CUDA initialization is too late.
+3. Seed all ranks deterministically.
+4. Create one full logical input and target. Every rank running a baseline must
    see identical values; do not add the rank to these seeds.
 4. Run the baseline with model-parallel behavior disabled, even if the
    distributed process group is already initialized.
