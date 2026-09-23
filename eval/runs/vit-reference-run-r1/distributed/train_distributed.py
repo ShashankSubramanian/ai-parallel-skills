@@ -36,14 +36,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_training_mesh(config: dict[str, Any], args: argparse.Namespace) -> None:
+    if min(args.dp, args.tp, args.cp) < 1:
+        raise ValueError("dp, tp, and cp must be positive")
     if args.dp != 1:
         raise ValueError(
             "global_batch_size=1 requires dp=1; changing dp would alter semantics"
         )
-    if args.tp != 4:
-        raise ValueError("the approved training implementation requires tp=4")
-    if args.cp not in {4, 8, 16, 32}:
-        raise ValueError("supported cp degrees are 4, 8, 16, and 32")
     expected_world = args.dp * args.tp * args.cp
     launched_world = int(os.environ.get("WORLD_SIZE", "1"))
     if launched_world != expected_world:
@@ -67,7 +65,9 @@ def validate_training_mesh(config: dict[str, Any], args: argparse.Namespace) -> 
         raise ValueError("the approved fixed configuration disables checkpointing")
 
 
-def build_model(model_config: dict[str, Any]) -> DistributedVisionTransformer:
+def build_model(
+    model_config: dict[str, Any], *, cp: int
+) -> DistributedVisionTransformer:
     return DistributedVisionTransformer(
         image_size=tuple(int(value) for value in model_config["image_size"]),
         patch_size=int(model_config["patch_size"]),
@@ -78,7 +78,7 @@ def build_model(model_config: dict[str, Any]) -> DistributedVisionTransformer:
         heads=int(model_config["heads"]),
         mlp_ratio=float(model_config["mlp_ratio"]),
         dropout=float(model_config["dropout"]),
-        sequence_padding_multiple=32,
+        sequence_padding_multiple=cp,
     )
 
 
@@ -102,7 +102,7 @@ def main() -> None:
         if device.type == "cuda":
             torch.cuda.manual_seed_all(seed + comm.get_world_rank())
 
-        model = build_model(config["model"]).to(device)
+        model = build_model(config["model"], cp=args.cp).to(device)
         validate_param_comm_metadata(model, print_summary=args.debug_topology)
         init_params_for_shared_weights(model)
         model = init_ddp_model_and_reduction_hooks(model)

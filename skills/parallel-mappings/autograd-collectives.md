@@ -77,8 +77,9 @@ Provide `init_ddp_model_and_reduction_hooks(...)` with this behavior:
    `reduce` signature by dropping groups whose size is one while preserving the
    deterministic group order from the approved plan.
 2. Wrap the model in `DistributedDataParallel` with the `dp` process group.
-   For `gloo`, pass `device_ids=None` and `output_device=None`. Use the actual
-   DDP argument name `broadcast_buffers`.
+   For `gloo`, pass `device_ids=None` and `output_device=None`. Use
+   `forward_sync_buffers=False` on PyTorch versions that support it (and assume this to be the default); do not use
+   the deprecated `broadcast_buffers` argument.
 3. If every effective signature is empty, install no hook and use DDP's default
    reduction.
 4. If every trainable parameter has the same one-token signature `R`, use `R`

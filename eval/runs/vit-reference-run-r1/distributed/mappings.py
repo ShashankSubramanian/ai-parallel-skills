@@ -260,7 +260,7 @@ def init_ddp_model_and_reduction_hooks(
         process_group=comm.get_group("dp"),
         device_ids=device_ids,
         output_device=output_device,
-        broadcast_buffers=False,
+        forward_sync_buffers=False,
         find_unused_parameters=False,
     )
     if effective != {()}:

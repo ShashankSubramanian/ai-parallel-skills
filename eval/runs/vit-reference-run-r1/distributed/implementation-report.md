@@ -51,14 +51,14 @@ runtime imports could not be checked.
 | `model.py` | Complete TP+CP ViT implementation |
 | `train_distributed.py` | Distributed fixed-config training entry point |
 | `test_distributed.py` | Topology, metadata, shared-init, forward, input-gradient, and named weight-gradient tests |
-| `launch.sh` | Scheduler-neutral `test`, `train`, and `--help` interface |
+| `launch.sh` | Perlmutter Slurm/Shifter `test`, `train`, and `--help` interface |
 | `implementation-report.md` | This completion and verification record |
 
 ## Launch Commands
 
-Run each multi-node command on every node with the same `MASTER_ADDR` and
-`MASTER_PORT`; set `NODE_RANK` to a unique value from zero through
-`NNODES-1`. No command below has been executed here.
+Run each command once inside a Perlmutter Slurm allocation. The launcher starts
+one `torchrun` agent per node through `srun` and Shifter. No command below has
+been executed here.
 
 ### Help
 
@@ -72,7 +72,7 @@ Result: **unverified** (the script was syntax-checked but not executed).
 
 ```bash
 ./distributed/launch.sh test \
-  --nnodes 1 --nproc-per-node 1 --node-rank 0 \
+  --nnodes 1 --nproc-per-node 1 \
   --master-addr 127.0.0.1 --master-port 29500 \
   --backend gloo --dp 1 --tp 1 --cp 1
 ```
@@ -83,7 +83,7 @@ Result: **unverified**.
 
 ```bash
 ./distributed/launch.sh test \
-  --nnodes 1 --nproc-per-node 4 --node-rank 0 \
+  --nnodes 1 --nproc-per-node 4 \
   --master-addr 127.0.0.1 --master-port 29500 \
   --backend nccl --dp 1 --tp 2 --cp 2
 ```
@@ -94,7 +94,7 @@ Result: **unverified**.
 
 ```bash
 ./distributed/launch.sh test \
-  --nnodes 8 --nproc-per-node 4 --node-rank "$NODE_RANK" \
+  --nnodes 8 --nproc-per-node 4 \
   --master-addr "$MASTER_ADDR" --master-port "$MASTER_PORT" \
   --backend nccl --dp 1 --tp 4 --cp 8 --realistic-shape
 ```
@@ -109,7 +109,7 @@ the test is suitable for routine runs.
 
 ```bash
 ./distributed/launch.sh train \
-  --nnodes 8 --nproc-per-node 4 --node-rank "$NODE_RANK" \
+  --nnodes 8 --nproc-per-node 4 \
   --master-addr "$MASTER_ADDR" --master-port "$MASTER_PORT" \
   --backend nccl --dp 1 --tp 4 --cp 8 \
   --config config.yaml
@@ -121,7 +121,7 @@ Result: **unverified**.
 
 ```bash
 ./distributed/launch.sh train \
-  --nnodes 16 --nproc-per-node 4 --node-rank "$NODE_RANK" \
+  --nnodes 16 --nproc-per-node 4 \
   --master-addr "$MASTER_ADDR" --master-port "$MASTER_PORT" \
   --backend nccl --dp 1 --tp 4 --cp 16 \
   --config config.yaml
@@ -133,7 +133,7 @@ Result: **unverified**.
 
 ```bash
 ./distributed/launch.sh train \
-  --nnodes 32 --nproc-per-node 4 --node-rank "$NODE_RANK" \
+  --nnodes 32 --nproc-per-node 4 \
   --master-addr "$MASTER_ADDR" --master-port "$MASTER_PORT" \
   --backend nccl --dp 1 --tp 4 --cp 32 \
   --config config.yaml
@@ -183,22 +183,24 @@ Supported training configurations:
 
 - The supplied fixed model, data, precision, optimizer, dropout, and
   checkpointing configuration.
-- `dp=1,tp=4,cp={4,8,16,32}`.
-- World sizes `{16,32,64,128}` with four processes per node and `nnodes=cp`.
+- `dp=1` with positive TP and CP degrees whose product equals world size.
+- TP degrees that divide the configured head count, hidden size, and MLP hidden
+  size. CP padding is selected dynamically from the requested CP degree.
+- The analyzed meshes remain `dp=1,tp=4,cp={4,8,16,32}`. Other valid meshes
+  are experimental and may run out of memory.
 - NCCL is the intended training backend. Gloo exists for CPU/small tests.
 
 Rejected by validation:
 
 - `dp>1`, because it violates the fixed global-batch equation.
-- Training TP degrees other than four.
-- Training CP degrees outside `{4,8,16,32}`.
 - Mesh products that do not equal `WORLD_SIZE`.
+- Non-positive parallel degrees.
 - Nonzero dropout or enabled activation checkpointing.
 - Hidden size, head count, or MLP width not divisible by TP.
-- World sizes below 16 for fixed-config training.
 
-The test path intentionally permits smaller valid meshes and model dimensions
-to exercise world-size-one and combined-axis correctness.
+Training meshes outside the analyzed set are accepted for experimentation but
+are not claimed to fit in device memory. The test path uses smaller model
+dimensions to exercise world-size-one and combined-axis correctness.
 
 ## Remaining Assumptions and Unverified Claims
 

@@ -11,8 +11,7 @@ Usage:
 Options:
   --nnodes N              Number of nodes (default: 8)
   --nproc-per-node N      Processes/GPUs per node (default: 4)
-  --node-rank N           This node's rank, 0..nnodes-1 (default: 0)
-  --master-addr HOST      Rendezvous host (default: 127.0.0.1)
+  --master-addr HOST      Rendezvous host (default: first Slurm node)
   --master-port PORT      Rendezvous port (default: 29500)
   --backend NAME          nccl or gloo (default: nccl)
   --dp N                  Data-parallel degree (default: 1)
@@ -25,14 +24,12 @@ Options:
 The mesh must satisfy:
   nnodes * nproc-per-node = dp * tp * cp
 
-Train mode supports the approved fixed meshes:
-  16 GPUs:  dp=1 tp=4 cp=4   (4 nodes x 4 GPUs)
-  32 GPUs:  dp=1 tp=4 cp=8   (8 nodes x 4 GPUs; primary)
-  64 GPUs:  dp=1 tp=4 cp=16  (16 nodes x 4 GPUs)
-  128 GPUs: dp=1 tp=4 cp=32  (32 nodes x 4 GPUs)
+Train mode requires dp=1 because the fixed global batch size is one. Other TP
+and CP degrees are permitted when their product matches world size and the
+model dimensions are divisible by TP. Unanalyzed meshes may run out of memory.
 
-Run this same command on every node, changing only --node-rank. This script
-does not assume Slurm, PBS, or another scheduler.
+Run this command once inside a Slurm allocation. It starts one torchrun agent
+per node through srun and Shifter.
 EOF
 }
 
@@ -57,8 +54,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 TARGET_DIR=$(dirname -- "$SCRIPT_DIR")
 NNODES=8
 NPROC_PER_NODE=4
-NODE_RANK=0
-MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | awk 'NR==1 {print; exit}')
 MASTER_PORT=29500
 BACKEND=nccl
 DP=1
@@ -71,7 +67,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --nnodes) NNODES=$2; shift 2 ;;
     --nproc-per-node) NPROC_PER_NODE=$2; shift 2 ;;
-    --node-rank) NODE_RANK=$2; shift 2 ;;
     --master-addr) MASTER_ADDR=$2; shift 2 ;;
     --master-port) MASTER_PORT=$2; shift 2 ;;
     --backend) BACKEND=$2; shift 2 ;;
@@ -92,10 +87,6 @@ for value_name in NNODES NPROC_PER_NODE DP TP CP; do
     exit 2
   fi
 done
-if ! [[ "$NODE_RANK" =~ ^[0-9]+$ ]] || (( NODE_RANK >= NNODES )); then
-  echo "error: NODE_RANK must be in [0, $((NNODES - 1))]" >&2
-  exit 2
-fi
 if [[ -z "$MASTER_ADDR" ]]; then
   echo "error: MASTER_ADDR must not be empty" >&2
   exit 2
@@ -118,16 +109,8 @@ if (( WORLD_SIZE != MESH_SIZE )); then
 fi
 
 if [[ "$MODE" == "train" ]]; then
-  if (( DP != 1 || TP != 4 )); then
-    echo "error: train mode requires dp=1 and tp=4" >&2
-    exit 2
-  fi
-  if (( CP != 4 && CP != 8 && CP != 16 && CP != 32 )); then
-    echo "error: train mode supports cp in {4,8,16,32}" >&2
-    exit 2
-  fi
-  if (( NPROC_PER_NODE != 4 || NNODES != CP )); then
-    echo "error: train mode requires 4 processes per node and nnodes=cp" >&2
+  if (( DP != 1 )); then
+    echo "error: train mode requires dp=1 for global_batch_size=1" >&2
     exit 2
   fi
   if [[ ! -f "$CONFIG" ]]; then
