@@ -2,8 +2,8 @@
 /ai-parallelism-master 
 
 The current directory is the target workspace. Read `vit.py`, `config.yaml`,
-and `train.py` in full. Do not modify them. Create all outputs under
-`distributed/`.
+and `train.py` in full. Do not modify them. I want to parallelize the ViT model. 
+Create all outputs under `distributed/`.
 
 Target hardware:
 
