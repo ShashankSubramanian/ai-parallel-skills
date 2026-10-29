@@ -1,8 +1,10 @@
-# AI Parallel Skills
+# Model Parallel Skills
 
-Agent skills for parallelizing single-device **PyTorch** model training across GPUs and nodes using **Data (`dp`), Tensor (`tp`), Context (`cp`), and Spatial (`sp`) Parallelism**.
+Agent skills for parallelizing single-device AI model training across GPUs and nodes using **Data (`dp`), Tensor (`tp`), Context (`cp`), and Spatial (`sp`) Parallelism**.
 
-Instead of letting coding agents guess where to place `torch.distributed` collectives, this skill suite enforces a strict, Megatron-style engineering workflow: mathematical einsum contracts, memory/FLOP bottleneck analysis, human-approved sharding plans, orthogonal process-group generation, parameter communication metadata, autograd dual mappings, numerical equivalence tests, and optional `torch.compile` readiness.
+Instead of letting coding agents guess where to place communication collectives, this skill suite enforces a strict, first-principles engineering workflow:
+1. **Framework-agnostic analysis & planning:** Mathematical einsum contracts, memory/FLOP bottleneck analysis, device-mesh selection, and forward/backward collective derivation.
+2. **PyTorch distributed implementation & verification:** Orthogonal process-group generation (`torch.distributed`), parameter communication metadata, autograd dual mappings, DDP/FSDP reduction hooks, numerical equivalence tests, and optional `torch.compile` readiness.
 
 > **Scope:** Training parallelism (`dp`, `tp`, `cp`, `sp`, plus sequence parallelism over `tp` and DDP/FSDP state sharding). Pipeline parallelism and inference-only parallelism are out of scope.
 
@@ -10,11 +12,11 @@ Instead of letting coding agents guess where to place `torch.distributed` collec
 
 ## Key Features
 
-- **Contract-Driven Sharding:** Forces the agent to write logical and sharded tensor/einsum contracts (`b l e, e f -> b l f`) and mathematically derive forward collectives, activation gradients (`dgrad`), and parameter weight-gradient (`wgrad`) reductions before writing code.
+- **Contract-Driven Sharding (Framework-Agnostic):** Forces the agent to write logical and sharded tensor/einsum contracts (`b l e, e f -> b l f`) and mathematically derive forward collectives, activation gradients (`dgrad`), and parameter weight-gradient (`wgrad`) reductions before writing code.
 - **Non-Destructive Baseline Contract:** The agent treats your existing model, config, and single-device trainer as immutable inputs and generates the entire parallel implementation inside a standalone `distributed/` directory.
 - **Two Human-in-the-Loop Gates:** The agent stops and waits for explicit approval after generating `distributed/parallelism-plan.md` (and again after `distributed/compile-readiness.md` if using `torch.compile`).
 - **Rigorous Equivalence Testing:** Includes a mandatory test skeleton that verifies distributed forward outputs, input gradients, and named weight gradients against the single-device baseline using `torch.testing.assert_close`.
-- **`torch.compile` Readiness:** Audits distributed code for graph breaks, converts runtime shape checks to `torch._check`, hoists communicator queries to `__init__`, and guides choosing between Tier 1 (`@torch.compiler.disable` region compile) and Tier 2 (traceable custom ops / functional collectives).
+- **`torch.compile` Readiness:** Audits distributed PyTorch code for graph breaks, converts runtime shape checks to `torch._check`, hoists communicator queries to `__init__`, and guides choosing between Tier 1 (`@torch.compiler.disable` region compile) and Tier 2 (traceable custom ops / functional collectives).
 
 ---
 
@@ -27,8 +29,8 @@ Symlink or copy the `skills/` directory and `AGENTS.md` into your project or use
 ```bash
 # Inside your target project (or this repo):
 mkdir -p .cursor
-ln -s /path/to/ai-parallel-skills/skills .cursor/skills
-cp /path/to/ai-parallel-skills/AGENTS.md ./AGENTS.md
+ln -s /path/to/model-parallel-skills/skills .cursor/skills
+cp /path/to/model-parallel-skills/AGENTS.md ./AGENTS.md
 ```
 
 **Claude Code / Codex / Other Agents:**
