@@ -63,9 +63,9 @@ Every completed run must contain:
 distributed/
   analysis.md
   parallelism-plan.md
-  train.py
+  train_distributed.py
   launch.sh
-  tests/
+  test_distributed.py
   implementation-report.md
 ```
 
